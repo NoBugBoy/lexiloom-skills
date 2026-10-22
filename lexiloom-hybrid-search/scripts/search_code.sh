@@ -15,7 +15,11 @@ fi
 EXT_FILTER="${2:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
+if [[ -f "$(pwd)/.lexiloom/config.json" || -d "$(pwd)/.git" || -f "$(pwd)/pom.xml" || -f "$(pwd)/package.json" ]]; then
+  PROJECT_ROOT="$(pwd)"
+else
+  PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
+fi
 cd "${PROJECT_ROOT}"
 
 echo "🔍 [Code Search] 正在检索本地代码仓库: \"${KEYWORD}\" ..."

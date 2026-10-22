@@ -7,12 +7,17 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
+if [[ -d "$(pwd)/.git" || -f "$(pwd)/pom.xml" || -f "$(pwd)/package.json" ]]; then
+  PROJECT_ROOT="$(pwd)"
+else
+  PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
+fi
 
 echo "================================================================="
 echo "  🚀 LexiLoom 代码仓库 & 知识库混合检索 - 一键初始化向导"
 echo "  （此配置在当前仓库仅需执行一次，团队成员可共享工作空间绑定）"
 echo "================================================================="
+echo "📍 目标工程根目录: ${PROJECT_ROOT}"
 echo ""
 
 CONFIG_DIR="${PROJECT_ROOT}/.lexiloom"
@@ -72,16 +77,115 @@ BODY_JSON=$(echo "${WORKSPACES_RESP}" | sed '$d')
 SELECTED_WS_ID=""
 SELECTED_WS_NAME="默认工作空间"
 
-if [[ "${HTTP_CODE}" == "200" ]] && command -v jq >/dev/null 2>&1; then
-  echo "✅ 成功获取工作空间列表："
-  echo ""
-  echo "${BODY_JSON}" | jq -r '.[] | "  [\(.id)] \(.name) (\(.description // "无描述"))"'
-  echo ""
-  read -r -p "👉 请输入要绑定到当前代码工程的工作空间 ID [例如 1]: " SELECTED_WS_ID
-  SELECTED_WS_NAME=$(echo "${BODY_JSON}" | jq -r ".[] | select(.id == ${SELECTED_WS_ID}) | .name" 2>/dev/null || echo "工作空间-${SELECTED_WS_ID}")
+# 解析工作空间列表函数 (优先 Node.js -> Python3 -> jq)
+list_workspaces() {
+  local json_data="$1"
+  if command -v node >/dev/null 2>&1; then
+    node -e '
+      try {
+        const raw = process.argv[1];
+        let data = JSON.parse(raw);
+        if (data && !Array.isArray(data) && Array.isArray(data.data)) data = data.data;
+        if (!Array.isArray(data) || data.length === 0) {
+          process.exit(2);
+        }
+        data.forEach(item => {
+          const desc = item.description ? ` (${item.description})` : " (无描述)";
+          console.log(`  [${item.id}] ${item.name}${desc}`);
+        });
+      } catch (e) {
+        process.exit(1);
+      }
+    ' "$json_data"
+  elif command -v python3 >/dev/null 2>&1; then
+    python3 -c '
+import sys, json
+try:
+    data = json.loads(sys.argv[1])
+    items = data if isinstance(data, list) else data.get("data", [])
+    if not items:
+        sys.exit(2)
+    for item in items:
+        desc = (" (%s)" % item.get("description")) if item.get("description") else " (无描述)"
+        print("  [%s] %s%s" % (item.get("id"), item.get("name"), desc))
+except Exception:
+    sys.exit(1)
+' "$json_data"
+  elif command -v jq >/dev/null 2>&1; then
+    echo "$json_data" | jq -e -r '
+      (if type=="array" then . else .data end) |
+      if length == 0 then error("empty") else .[] | "  [\(.id)] \(.name) (\(.description // "无描述"))" end
+    ' 2>/dev/null
+  else
+    return 1
+  fi
+}
+
+# 根据 ID 提取工作空间名称函数
+get_workspace_name() {
+  local json_data="$1"
+  local target_id="$2"
+  if command -v node >/dev/null 2>&1; then
+    node -e '
+      try {
+        let data = JSON.parse(process.argv[1]);
+        if (data && !Array.isArray(data) && Array.isArray(data.data)) data = data.data;
+        const found = data.find(item => String(item.id) === process.argv[2]);
+        if (found && found.name) process.stdout.write(found.name);
+      } catch (e) {}
+    ' "$json_data" "$target_id"
+  elif command -v python3 >/dev/null 2>&1; then
+    python3 -c '
+import sys, json
+try:
+    data = json.loads(sys.argv[1])
+    items = data if isinstance(data, list) else data.get("data", [])
+    for item in items:
+        if str(item.get("id")) == sys.argv[2]:
+            sys.stdout.write(str(item.get("name", "")))
+            break
+except Exception:
+    pass
+' "$json_data" "$target_id"
+  elif command -v jq >/dev/null 2>&1; then
+    echo "$json_data" | jq -r --arg id "$target_id" '
+      (if type=="array" then . else .data end) | .[] | select((.id|tostring) == $id) | .name
+    ' 2>/dev/null || true
+  fi
+}
+
+if [[ "${HTTP_CODE}" == "200" ]]; then
+  set +e
+  WS_OUTPUT=$(list_workspaces "${BODY_JSON}")
+  PARSE_STATUS=$?
+  set -e
+
+  if [[ ${PARSE_STATUS} -eq 0 && -n "${WS_OUTPUT}" ]]; then
+    echo "✅ 成功获取工作空间列表："
+    echo ""
+    echo "${WS_OUTPUT}"
+    echo ""
+    read -r -p "👉 请输入要绑定到当前代码工程的工作空间 ID [例如 1]: " SELECTED_WS_ID
+    SELECTED_WS_NAME=$(get_workspace_name "${BODY_JSON}" "${SELECTED_WS_ID}")
+    if [[ -z "${SELECTED_WS_NAME}" ]]; then
+      SELECTED_WS_NAME="工作空间-${SELECTED_WS_ID}"
+    fi
+  elif [[ ${PARSE_STATUS} -eq 2 ]]; then
+    echo "⚠️  服务端返回成功 (HTTP 200)，但当前账号下未找到任何可用工作空间。"
+    echo "👉 建议先前往 LexiLoom Web 控制台创建空间，或在此手动指定工作空间 ID："
+    read -r -p "👉 请输入工作空间 ID [默认 1]: " SELECTED_WS_ID
+  else
+    echo "ℹ️  提示: 未能自动解析工作空间列表 (HTTP 200)，进入手动指定模式。"
+    read -r -p "👉 请直接输入你要绑定的工作空间 ID [例如 1]: " SELECTED_WS_ID
+  fi
+elif [[ "${HTTP_CODE}" == "401" || "${HTTP_CODE}" == "403" ]]; then
+  echo "❌ 提示: 鉴权失败 (HTTP ${HTTP_CODE})，请检查 API Key 是否有效！"
+  read -r -p "👉 请输入你要绑定的工作空间 ID [例如 1]: " SELECTED_WS_ID
+elif [[ "${HTTP_CODE}" == "404" ]]; then
+  echo "ℹ️  提示: 服务端工作空间发现端点 [/api/ai/mcp/workspaces] 尚未就绪 (HTTP 404)，进入手动指定模式。"
+  read -r -p "👉 请直接输入你要绑定的工作空间 ID [例如 1]: " SELECTED_WS_ID
 else
-  # 降级模式：若后端端点尚未就绪或未安装 jq，支持手动输入
-  echo "ℹ️  提示: 未能自动列出工作空间 (HTTP ${HTTP_CODE})，进入手动指定模式。"
+  echo "ℹ️  提示: 连接服务端异常 (HTTP ${HTTP_CODE})，进入手动指定模式。"
   read -r -p "👉 请直接输入你要绑定的工作空间 ID [例如 1]: " SELECTED_WS_ID
 fi
 

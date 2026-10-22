@@ -15,7 +15,11 @@ fi
 TOP_K="${2:-5}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
+if [[ -f "$(pwd)/.lexiloom/config.json" || -d "$(pwd)/.git" || -f "$(pwd)/pom.xml" || -f "$(pwd)/package.json" ]]; then
+  PROJECT_ROOT="$(pwd)"
+else
+  PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
+fi
 
 CONFIG_FILE="${PROJECT_ROOT}/.lexiloom/config.json"
 ENV_FILE="${PROJECT_ROOT}/.lexiloom.env"
@@ -47,7 +51,6 @@ fi
 echo "📚 [Knowledge Search] 正在检索 LexiLoom 知识库 [空间: ${WORKSPACE_NAME}(ID:${WORKSPACE_ID})]: \"${QUERY}\" ..."
 
 # 2. 发起轻量无头检索请求
-# 优先请求 MCP 轻量无头端点，返回标准 JSON 切片列表
 RESPONSE=$(curl -s -w "\n%{http_code}" -X GET \
   "${SERVER_URL}/api/ai/mcp/search" \
   -H "Authorization: Bearer ${API_KEY}" \
@@ -60,16 +63,66 @@ RESPONSE=$(curl -s -w "\n%{http_code}" -X GET \
 HTTP_CODE=$(echo "${RESPONSE}" | tail -n1)
 BODY=$(echo "${RESPONSE}" | sed '$d')
 
-if [[ "${HTTP_CODE}" == "200" ]]; then
-  if command -v jq >/dev/null 2>&1; then
-    COUNT=$(echo "${BODY}" | jq -r '.results | length' 2>/dev/null || echo "0")
+# 格式化检索切片输出函数
+format_search_results() {
+  local json_data="$1"
+  if command -v node >/dev/null 2>&1; then
+    node -e '
+      try {
+        const raw = process.argv[1];
+        let data = JSON.parse(raw);
+        const results = data.results || (Array.isArray(data) ? data : []);
+        console.log(`✅ 成功检索到 ${results.length} 条相关知识库切片：\n`);
+        results.forEach(item => {
+          const title = item.documentTitle || "无标题";
+          const score = item.score !== undefined ? item.score : "N/A";
+          const chunkIdx = item.chunkIndex !== undefined ? item.chunkIndex : 0;
+          const docId = item.documentId || "N/A";
+          const content = (item.content || "").replace(/\n/g, " ");
+          console.log(`📄 文档: 《${title}》 [相关度得分: ${score}]`);
+          console.log(`   切片序号: #${chunkIdx} | 文档ID: ${docId}`);
+          console.log(`   摘要摘录: ${content}`);
+          console.log("----------------------------------------------------------------");
+        });
+      } catch(e) {
+        console.log("✅ 检索成功 (原始 JSON 输出)：");
+        console.log(process.argv[1]);
+      }
+    ' "$json_data"
+  elif command -v python3 >/dev/null 2>&1; then
+    python3 -c '
+import sys, json
+try:
+    data = json.loads(sys.argv[1])
+    results = data.get("results", data if isinstance(data, list) else [])
+    print("✅ 成功检索到 %d 条相关知识库切片：\n" % len(results))
+    for item in results:
+        title = item.get("documentTitle", "无标题")
+        score = item.get("score", "N/A")
+        chunk_idx = item.get("chunkIndex", 0)
+        doc_id = item.get("documentId", "N/A")
+        content = (item.get("content") or "").replace("\n", " ")
+        print("📄 文档: 《%s》 [相关度得分: %s]" % (title, score))
+        print("   切片序号: #%s | 文档ID: %s" % (chunk_idx, doc_id))
+        print("   摘要摘录: %s" % content)
+        print("----------------------------------------------------------------")
+except Exception:
+    print("✅ 检索成功 (原始 JSON 输出)：")
+    print(sys.argv[1])
+' "$json_data"
+  elif command -v jq >/dev/null 2>&1; then
+    COUNT=$(echo "${json_data}" | jq -r '.results | length' 2>/dev/null || echo "0")
     echo "✅ 成功检索到 ${COUNT} 条相关知识库切片："
     echo ""
-    echo "${BODY}" | jq -r '.results[] | "📄 文档: 《\(.documentTitle)》 [相关度得分: \(.score // "N/A")]\n   切片序号: #\(.chunkIndex // 0) | 文档ID: \(.documentId)\n   摘要摘录: \(.content | gsub("\n"; " "))\n----------------------------------------------------------------"'
+    echo "${json_data}" | jq -r '.results[] | "📄 文档: 《\(.documentTitle)》 [相关度得分: \(.score // "N/A")]\n   切片序号: #\(.chunkIndex // 0) | 文档ID: \(.documentId)\n   摘要摘录: \(.content | gsub("\n"; " "))\n----------------------------------------------------------------"'
   else
     echo "✅ 检索成功 (原始 JSON 输出)："
-    echo "${BODY}"
+    echo "${json_data}"
   fi
+}
+
+if [[ "${HTTP_CODE}" == "200" ]]; then
+  format_search_results "${BODY}"
 elif [[ "${HTTP_CODE}" == "404" ]]; then
   echo "⚠️ 提示: 后端轻量检索端点 [/api/ai/mcp/search] 尚未就绪 (HTTP 404)。"
   echo "👉 建议先在后端实现该 MCP/Skill 专用无状态检索 API。"
