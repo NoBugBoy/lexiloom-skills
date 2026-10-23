@@ -8,7 +8,7 @@
 npx lexiloom-hybrid-search
 ```
 
-按提示选择安装范围（当前项目或当前用户全局）和 Agent。也可以使用非交互命令：
+按提示选择安装范围（当前项目或当前用户全局）和 Agent；安装完成后会自动启动工作空间绑定向导。也可以使用非交互命令：
 
 ```bash
 # 当前项目安装到 Codex 和 Claude Code
@@ -19,6 +19,12 @@ npx lexiloom-hybrid-search --scope global --agent codex --yes
 
 # 兼容旧命令：安装到所有支持的 Agent 的全局目录（包括 Pi）
 npx lexiloom-hybrid-search -g
+
+# 只安装，不启动工作空间绑定向导
+npx lexiloom-hybrid-search --scope project --agent codex --only-install --yes
+
+# 已安装后，只启动当前项目的工作空间绑定向导
+npx lexiloom-hybrid-search --only-setup
 
 # 卸载指定目标
 npx lexiloom-hybrid-search --scope project --agent codex --uninstall --yes
@@ -40,7 +46,7 @@ npx lexiloom-hybrid-search --scope project --agent codex --uninstall --yes
 
 ## 配置 LexiLoom
 
-安装完成后，在**目标代码仓库根目录**执行安装器提示的命令，例如：
+默认安装流程会在安装完成后自动运行 `setup.sh`。也可以在**目标代码仓库根目录**单独运行：
 
 ```bash
 bash .agents/skills/lexiloom-hybrid-search/scripts/setup.sh

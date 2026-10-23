@@ -40,11 +40,11 @@ const AGENTS = {
 };
 
 function usage() {
-  console.log(`LexiLoom Hybrid Search Skill installer\n\nUsage:\n  npx lexiloom-hybrid-search [options]\n\nOptions:\n  -g, --global             Install globally for all supported agents\n  --scope project|global   Install scope (default: interactive)\n  --agent <list>           Agent names, comma-separated: codex,claude,gemini,antigravity,pi\n  --uninstall              Remove the Skill from selected targets\n  --yes                    Do not ask for confirmation (requires --scope and --agent)\n  -h, --help               Show this help\n\nExamples:\n  npx lexiloom-hybrid-search\n  npx lexiloom-hybrid-search -g\n  npx lexiloom-hybrid-search --scope project --agent codex,claude\n  npx lexiloom-hybrid-search --scope global --agent pi --yes`);
+  console.log(`LexiLoom Hybrid Search Skill installer\n\nUsage:\n  npx lexiloom-hybrid-search [options]\n\nOptions:\n  -g, --global             Install globally for all supported agents\n  --scope project|global   Install scope (default: interactive)\n  --agent <list>           Agent names, comma-separated: codex,claude,gemini,antigravity,pi\n  --only-install           Install the Skill without starting setup\n  --only-setup             Start setup without installing the Skill\n  --uninstall              Remove the Skill from selected targets\n  --yes                    Do not ask for confirmation (requires --scope and --agent)\n  -h, --help               Show this help\n\nExamples:\n  npx lexiloom-hybrid-search\n  npx lexiloom-hybrid-search -g\n  npx lexiloom-hybrid-search --scope project --agent codex,claude\n  npx lexiloom-hybrid-search --scope global --agent pi --yes`);
 }
 
 function parseArgs(argv) {
-  const opts = { scope: '', agent: '', uninstall: false, yes: false, help: false, legacyGlobal: false };
+  const opts = { scope: '', agent: '', onlyInstall: false, onlySetup: false, uninstall: false, yes: false, help: false, legacyGlobal: false };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--scope' || arg === '--agent') {
@@ -54,12 +54,16 @@ function parseArgs(argv) {
     } else if (arg === '-g' || arg === '--global') {
       opts.scope = 'global';
       opts.legacyGlobal = true;
-    } else if (arg === '--uninstall') opts.uninstall = true;
+    } else if (arg === '--only-install') opts.onlyInstall = true;
+    else if (arg === '--only-setup') opts.onlySetup = true;
+    else if (arg === '--uninstall') opts.uninstall = true;
     else if (arg === '--yes' || arg === '-y') opts.yes = true;
     else if (arg === '--help' || arg === '-h') opts.help = true;
     else throw new Error(`未知参数：${arg}`);
   }
   if (opts.scope && !['project', 'global'].includes(opts.scope)) throw new Error('--scope 只能是 project 或 global');
+  if (opts.onlyInstall && opts.onlySetup) throw new Error('--only-install 与 --only-setup 不能同时使用');
+  if (opts.onlySetup && opts.uninstall) throw new Error('--only-setup 不能与 --uninstall 同时使用');
   return opts;
 }
 
@@ -73,6 +77,30 @@ function parseAgents(value) {
 async function ask(rl, question, fallback) {
   const answer = (await rl.question(`${question}${fallback ? ` [${fallback}]` : ''}: `)).trim();
   return answer || fallback;
+}
+
+function findSetupScript(targets = []) {
+  const candidates = [
+    ...targets.map(target => path.join(target, 'scripts', 'setup.sh')),
+    ...Object.values(AGENTS).map(agent => path.join(agent.project(process.cwd()), SKILL_NAME, 'scripts', 'setup.sh')),
+    path.join(SOURCE_DIR, 'scripts', 'setup.sh'),
+  ];
+  return candidates.find(candidate => fs.existsSync(candidate));
+}
+
+function runSetup(targets) {
+  const setupScript = findSetupScript(targets);
+  if (!setupScript) throw new Error('未找到 setup.sh 引导脚本，请检查技能安装完整性');
+  fs.chmodSync(setupScript, 0o755);
+  const result = require('node:child_process').spawnSync('bash', [setupScript], {
+    stdio: 'inherit',
+    cwd: process.cwd(),
+  });
+  if (result.error) throw new Error(`执行初始化脚本失败：${result.error.message}`);
+  if (result.status !== 0) {
+    const suffix = result.signal ? `（信号：${result.signal}）` : `（退出码：${result.status}）`;
+    throw new Error(`初始化脚本执行失败${suffix}`);
+  }
 }
 
 function safeReplaceDirectory(target) {
@@ -111,6 +139,11 @@ async function main() {
   const opts = parseArgs(process.argv.slice(2));
   if (opts.help) return usage();
   if (!fs.existsSync(SOURCE_DIR)) throw new Error(`找不到待安装的 Skill 文件：${SOURCE_DIR}`);
+
+  if (opts.onlySetup) {
+    runSetup();
+    return;
+  }
 
   const interactive = !opts.legacyGlobal && !opts.yes && (!opts.scope || !opts.agent);
   const rl = interactive ? readline.createInterface({ input, output }) : null;
@@ -158,10 +191,11 @@ async function main() {
       }
     }
     if (failures) process.exitCode = 1;
-    else if (!opts.uninstall) {
-      console.log('\n下一步：进入目标代码仓库，执行：');
-      console.log(`  bash "${targets[0]}/scripts/setup.sh"`);
-      console.log('配置服务地址与工作空间后，即可让 Agent 使用该 Skill。');
+    else if (!opts.uninstall && !opts.onlyInstall) {
+      console.log('\n🚀 正在启动工程工作空间绑定向导...');
+      runSetup(targets);
+    } else if (!opts.uninstall) {
+      console.log('\n技能安装完成，已按要求跳过初始化向导。');
     }
   } finally {
     if (rl) rl.close();
