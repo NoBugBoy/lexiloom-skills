@@ -12,49 +12,51 @@ LexiLoom 官方 AI Agent 技能库（Agent Skills），用于赋能现代 AI 编
 
 ---
 
-## ⚡️ 安装指南 (Installation)
+## ⚡️ 极速上手：一键安装并初始化（推荐）
 
-推荐使用现代 AI Agent 开放技能管理器 **Skills CLI** (`npx skills`) 进行一键安装：
+为了省去手动执行后续绑定脚本的步骤，我们提供了一体化的自动化 CLI。在你的代码工程根目录下直接运行：
 
-### 1. 为当前工程安装 (Project-Level)
+```bash
+npx github:NoBugBoy/lexiloom-skills
+```
+*(已发布 npm 的环境亦支持直接执行 `npx lexiloom-skills`)*
 
-在你的代码工程根目录下执行：
+> [!TIP]
+> **该命令会自动执行以下完整闭环：**
+> 1. 自动调用 Skills CLI 将技能安装并挂载至项目下的主流 AI Agent；
+> 2. 紧接着自动拉起终端交互向导，引导你输入 LexiLoom 服务端地址与 API Key 并选择工作空间；
+> 3. 自动生成 `.lexiloom/config.json` 与 `.lexiloom.env`，并自动向 `.gitignore` 追加入库保护规则。
+
+---
+
+## 🛠️ 分步使用指南
+
+如果你偏好传统的两步式管理流程，也可以通过标准命令分步执行：
+
+### 步骤一：通过 Skills CLI 仅安装技能
 
 ```bash
 # 交互式选择安装目标 Agent (Cursor, Claude Code, Antigravity 等)
 npx skills add NoBugBoy/lexiloom-skills
 
-# 或静默安装所有技能至所有受支持的 Agent
+# 或静默安装全部技能至所有受支持的 Agent
 npx skills add NoBugBoy/lexiloom-skills --all
-```
 
-### 2. 全局安装 (Global-Level)
-
-如果你希望在当前开发机的所有工程中均可激活该技能：
-
-```bash
+# 用户全局安装 (所有工程共用)
 npx skills add NoBugBoy/lexiloom-skills -g
 ```
 
-### 3. 指定单一技能安装
+> [!NOTE]
+> 为什么 `npx skills add` 不直接静默执行脚本？  
+> 遵循 open standard [skills.sh](https://skills.sh) 规范的安全模型，`skills add` 出于防范恶意代码注入考量，仅复制/软链接技能声明，默认不执行任意安装期 shell 脚本。
 
-```bash
-npx skills add NoBugBoy/lexiloom-skills --skill lexiloom-hybrid-search
-```
+### 步骤二：手动运行初始化向导
 
----
-
-## 🛠️ 初始化与绑定 (Configuration)
-
-安装完成后，在目标代码工程根目录运行初始化向导，绑定 LexiLoom 后端地址与工作空间：
+技能文件安装后，在目标代码工程根目录运行：
 
 ```bash
 bash .agents/skills/lexiloom-hybrid-search/scripts/setup.sh
 ```
-
-向导将自动生成：
-- `.lexiloom/config.json`：工作空间关联配置（可安全提交至团队 Git 共享）
-- `.lexiloom.env`：本地私密 API Key（已自动被 `.gitignore` 规则保护）
 
 ---
 

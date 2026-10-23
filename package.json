@@ -1,0 +1,33 @@
+{
+  "name": "lexiloom-skills",
+  "version": "1.0.1",
+  "description": "LexiLoom AI Agent Skills 一键安装与工作空间初始化向导",
+  "bin": {
+    "lexiloom-skills": "./bin/cli.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NoBugBoy/lexiloom-skills.git"
+  },
+  "keywords": [
+    "lexiloom",
+    "agent-skills",
+    "skills",
+    "antigravity",
+    "claude-code",
+    "cursor",
+    "codex",
+    "rag"
+  ],
+  "author": "YuJian",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/NoBugBoy/lexiloom-skills/issues"
+  },
+  "homepage": "https://github.com/NoBugBoy/lexiloom-skills#readme",
+  "files": [
+    "bin",
+    "lexiloom-hybrid-search",
+    "README.md"
+  ]
+}
