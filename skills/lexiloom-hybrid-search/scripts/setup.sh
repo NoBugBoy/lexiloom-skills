@@ -70,7 +70,24 @@ set -e
 if (( CURL_STATUS != 0 )); then echo "连接失败或超时。请检查服务地址和网络；未写入配置。" >&2; exit 1; fi
 case "$HTTP_CODE" in
   200) ;;
-  401|403) echo "鉴权失败（HTTP $HTTP_CODE）。请检查 API Key；未写入配置。" >&2; exit 1 ;;
+  401|403)
+    DETAIL="$(python3 - "$TMP_BODY" <<'PY'
+import json, re, sys
+try:
+    with open(sys.argv[1], encoding='utf-8') as f: detail=json.load(f).get('detail', '')
+    if isinstance(detail, str):
+        detail=re.sub(r'[\x00-\x1f\x7f]+', ' ', detail).strip()[:300]
+        print(detail)
+except Exception:
+    pass
+PY
+)"
+    if [[ -n "$DETAIL" ]]; then
+      echo "鉴权失败（HTTP $HTTP_CODE）：$DETAIL；未写入配置。" >&2
+    else
+      echo "鉴权失败（HTTP $HTTP_CODE）。请检查 API Key；未写入配置。" >&2
+    fi
+    exit 1 ;;
   404) echo "工作空间发现接口不存在（HTTP 404）。请先部署 /api/v1/openapi/workspaces；未写入配置。" >&2; exit 1 ;;
   *) echo "读取工作空间失败（HTTP $HTTP_CODE）。未写入配置。" >&2; exit 1 ;;
 esac

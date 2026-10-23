@@ -64,7 +64,7 @@ bash .agents/skills/lexiloom-hybrid-search/scripts/setup.sh
 
 ## 常见问题
 
-- **401/403**：检查 API Key 与工作空间访问权限。
-- **404**：确认后端已实现 `/api/v1/openapi/workspaces` 和 `/api/v1/openapi/search`。
+- **401**：凭证缺失、无效或未登录；**403**：检查 API Key 的 scope、工作空间白名单及文档权限。后端返回的具体原因会优先展示。
+- **404**：确认后端已实现 `/api/v1/openapi/workspaces` 和 `/api/v1/openapi/knowledge/search`。
 - **无法定位项目根目录**：请从目标仓库根目录运行 `setup.sh` 或检索脚本。
 - **Agent 未识别 Skill**：确认目标目录是否符合该 Agent 当前版本的 Skills 目录约定，并重启/刷新 Agent。

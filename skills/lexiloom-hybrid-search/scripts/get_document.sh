@@ -67,8 +67,26 @@ fi
 case "$HTTP_CODE" in
   200) ;;
   400) echo "文档详情请求参数错误（HTTP 400）。请确认 documentId 是正整数。" >&2; exit 1 ;;
-  401) echo "文档详情鉴权失败（HTTP 401）。请检查 API Key。" >&2; exit 1 ;;
-  403) echo "无权读取文档（HTTP 403）。请确认当前凭证对该文档具有读取权限。" >&2; exit 1 ;;
+  401|403)
+    DETAIL="$(python3 - "$TMP_BODY" <<'PY'
+import json, re, sys
+try:
+    with open(sys.argv[1], encoding='utf-8') as f: detail=json.load(f).get('detail', '')
+    if isinstance(detail, str):
+        detail=re.sub(r'[\x00-\x1f\x7f]+', ' ', detail).strip()[:300]
+        print(detail)
+except Exception:
+    pass
+PY
+)"
+    if [[ -n "$DETAIL" ]]; then
+      echo "文档详情请求失败（HTTP $HTTP_CODE）：$DETAIL" >&2
+    elif [[ "$HTTP_CODE" == 401 ]]; then
+      echo "文档详情鉴权失败（HTTP 401）。请检查 API Key。" >&2
+    else
+      echo "无权读取文档（HTTP 403）。请确认当前凭证对该文档具有读取权限。" >&2
+    fi
+    exit 1 ;;
   404) echo "文档详情请求返回 HTTP 404：文档可能不存在，也可能是详情端点未部署或路径不匹配。" >&2; exit 1 ;;
   429) echo "请求过于频繁（HTTP 429），请稍后重试。" >&2; exit 1 ;;
   5*) echo "知识库服务暂时异常（HTTP $HTTP_CODE），请检查后端日志。" >&2; exit 1 ;;

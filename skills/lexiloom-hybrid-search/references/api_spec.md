@@ -5,7 +5,8 @@
 ## 1. 鉴权（MVP 现状）
 
 - 请求头：`Authorization: Bearer <API_KEY>`；如后端已支持，也可兼容 `X-API-Key`。
-- 当前 MVP 暂时沿用已有管理员 API Key 机制。密钥管理、最小权限、过期和轮转策略留待后续阶段，不在本 Skill 中实现。
+- OpenAPI Key 按 scope 控制接口权限：`/workspaces` 需要 `kb:read`，知识库检索需要 `kb:search`，文档详情需要 `doc:read`，对话补全需要 `chat:completion`。scope 不足时后端返回 HTTP `403`，ProblemDetail 的 `detail` 字段说明缺少的权限范围，例如 `当前 API Key 未授予 kb:search 权限范围`。
+- 后端权限校验也可能因工作空间白名单或用户/文档权限返回 `403`；客户端应优先展示 ProblemDetail 的 `detail`，不可用时再显示通用权限提示。`401` 表示凭证缺失、无效或未登录。
 - 客户端不得将 Key 写入可提交配置、日志或检索输出。项目级 `.lexiloom.env` 应加入 `.gitignore`，文件权限建议为 `600`。
 - `LEXILOOM_API_KEY` 环境变量优先于 `.lexiloom.env`。
 
@@ -27,7 +28,7 @@
 
 ## 3. 知识库切片检索
 
-`GET /api/v1/openapi/search`（若后端只实现 POST，则客户端需同步调整）
+推荐使用 `POST /api/v1/openapi/knowledge/search`（后端同时支持 `GET /api/v1/openapi/knowledge/search`，脚本使用 GET 便于命令行联调）。
 
 | 参数 | 类型 | 必填 | 默认值 | 说明 |
 |---|---|---:|---:|---|
@@ -79,7 +80,7 @@
 
 详情以 JSON 对象直接返回（不是 `data` 包装）。`scripts/get_document.sh <documentId>` 保留并展示这些实际字段及完整 `content`。客户端不应自行重命名或推导版本状态字段。
 
-Skill 应先通过 `/search` 获得 `documentId`，再按需请求详情，并将切片与全文核对。`403` 表示无权限；`404` 可能是文档不存在，也可能是端点未部署或路径不匹配，客户端无法仅凭状态码区分。
+Skill 应先通过 `/knowledge/search` 获得 `documentId`，再按需请求详情，并将切片与全文核对。`403` 表示无权限；`404` 可能是文档不存在，也可能是端点未部署或路径不匹配，客户端无法仅凭状态码区分。
 
 ## 5. 错误语义
 
