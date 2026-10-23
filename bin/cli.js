@@ -193,6 +193,9 @@ async function main() {
     if (failures) process.exitCode = 1;
     else if (!opts.uninstall && !opts.onlyInstall) {
       console.log('\n🚀 正在启动工程工作空间绑定向导...');
+      // Release stdin from the parent readline interface before handing the
+      // terminal to setup.sh; otherwise it can consume the child's prompts.
+      if (rl) rl.close();
       runSetup(targets);
     } else if (!opts.uninstall) {
       console.log('\n技能安装完成，已按要求跳过初始化向导。');
