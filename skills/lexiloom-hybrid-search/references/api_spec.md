@@ -11,7 +11,7 @@
 
 ## 2. 工作空间列表
 
-`GET /api/ai/mcp/workspaces`
+`GET /api/v1/openapi/workspaces`
 
 用途：初始化时列出当前凭证可访问的工作空间，用户必须选择服务端实际返回的 ID。客户端不得在失败时猜测 ID 或静默使用 `1`。
 
@@ -27,7 +27,7 @@
 
 ## 3. 知识库切片检索
 
-`GET /api/ai/mcp/search`（若后端只实现 POST，则客户端需同步调整）
+`GET /api/v1/openapi/search`（若后端只实现 POST，则客户端需同步调整）
 
 | 参数 | 类型 | 必填 | 默认值 | 说明 |
 |---|---|---:|---:|---|
@@ -59,11 +59,27 @@
 
 客户端兼容顶层数组以及 `{ "data": { "results": [...] } }` 包装响应。`score` 是检索系统的相关度指标，不是事实正确率或置信概率。
 
-## 4. 文档详情（可选）
+## 4. 文档详情
 
-`GET /api/ai/mcp/documents/{id}`
+`GET /api/v1/openapi/documents/{id}`
 
-用于后续需要读取完整文档时。当前两个 shell 脚本不依赖此端点，若后端尚未实现，不影响切片检索 MVP。
+用于根据切片结果中的 `documentId` 按需读取单篇文档详情。后端 `McpDocumentDetailVO` 的真实字段为：
+
+| 字段 | 类型 | 含义 |
+|---|---|---|
+| `id` | integer | 文档 ID |
+| `title` | string | 标题 |
+| `workspaceId` | integer | 工作空间 ID |
+| `categoryName` | string | 分类名称 |
+| `status` | string | 文档状态 |
+| `version` | integer | 当前版本号 |
+| `content` | string | 文档正文 |
+| `createTime` | string | 创建时间 |
+| `updateTime` | string | 更新时间 |
+
+详情以 JSON 对象直接返回（不是 `data` 包装）。`scripts/get_document.sh <documentId>` 保留并展示这些实际字段及完整 `content`。客户端不应自行重命名或推导版本状态字段。
+
+Skill 应先通过 `/search` 获得 `documentId`，再按需请求详情，并将切片与全文核对。`403` 表示无权限；`404` 可能是文档不存在，也可能是端点未部署或路径不匹配，客户端无法仅凭状态码区分。
 
 ## 5. 错误语义
 
@@ -73,7 +89,7 @@
 | `400` | 参数错误；提示检查 query/topK/workspaceId |
 | `401` | 凭证缺失或无效 |
 | `403` | 凭证无权访问目标工作空间 |
-| `404` | 端点未部署或路径不匹配 |
+| `404` | 资源不存在，或端点未部署/路径不匹配；结合请求路径排查 |
 | `429` | 限流；稍后重试 |
 | `5xx` | 服务端异常；检查服务日志 |
 | 网络错误/超时 | 检查 URL、网络与服务健康状态 |

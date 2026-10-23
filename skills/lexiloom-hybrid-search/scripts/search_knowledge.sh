@@ -64,7 +64,7 @@ set +e
 HTTP_CODE="$(curl --silent --show-error --get \
   --connect-timeout 5 --max-time 30 \
   --output "$TMP_BODY" --write-out '%{http_code}' \
-  "$SERVER_URL/api/ai/mcp/search" \
+  "$SERVER_URL/api/v1/openapi/search" \
   --header "Authorization: Bearer $API_KEY" \
   --header 'Accept: application/json' \
   --data-urlencode "q=$QUERY" --data-urlencode "workspaceId=$WORKSPACE_ID" --data-urlencode "topK=$TOP_K")"
@@ -76,7 +76,7 @@ fi
 case "$HTTP_CODE" in
   200) ;;
   401|403) echo "知识库检索鉴权失败（HTTP $HTTP_CODE）。请检查 API Key 与工作空间访问权限。" >&2; exit 1 ;;
-  404) echo "知识库检索接口不存在（HTTP 404）：请确认后端已部署 /api/ai/mcp/search。" >&2; exit 1 ;;
+  404) echo "知识库检索接口不存在（HTTP 404）：请确认后端已部署 /api/v1/openapi/search。" >&2; exit 1 ;;
   429) echo "请求过于频繁（HTTP 429），请稍后重试。" >&2; exit 1 ;;
   5*) echo "知识库服务暂时异常（HTTP $HTTP_CODE），请检查后端日志。" >&2; exit 1 ;;
   *) echo "知识库检索请求失败（HTTP $HTTP_CODE）。响应正文已隐藏，避免意外泄露敏感信息。" >&2; exit 1 ;;

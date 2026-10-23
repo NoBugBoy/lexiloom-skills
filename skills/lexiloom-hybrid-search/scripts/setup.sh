@@ -63,7 +63,7 @@ TMP_BODY="$(mktemp)"; trap 'rm -f "$TMP_BODY"' EXIT
 set +e
 HTTP_CODE="$(curl --silent --show-error --connect-timeout 5 --max-time 20 \
   --output "$TMP_BODY" --write-out '%{http_code}' \
-  "$SERVER_URL/api/ai/mcp/workspaces" \
+  "$SERVER_URL/api/v1/openapi/workspaces" \
   --header "Authorization: Bearer $API_KEY" --header 'Accept: application/json')"
 CURL_STATUS=$?
 set -e
@@ -71,7 +71,7 @@ if (( CURL_STATUS != 0 )); then echo "连接失败或超时。请检查服务地
 case "$HTTP_CODE" in
   200) ;;
   401|403) echo "鉴权失败（HTTP $HTTP_CODE）。请检查 API Key；未写入配置。" >&2; exit 1 ;;
-  404) echo "工作空间发现接口不存在（HTTP 404）。请先部署 /api/ai/mcp/workspaces；未写入配置。" >&2; exit 1 ;;
+  404) echo "工作空间发现接口不存在（HTTP 404）。请先部署 /api/v1/openapi/workspaces；未写入配置。" >&2; exit 1 ;;
   *) echo "读取工作空间失败（HTTP $HTTP_CODE）。未写入配置。" >&2; exit 1 ;;
 esac
 

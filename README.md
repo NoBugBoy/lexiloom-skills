@@ -42,7 +42,7 @@ npx lexiloom-hybrid-search --scope project --agent codex --uninstall --yes
 bash .agents/skills/lexiloom-hybrid-search/scripts/setup.sh
 ```
 
-`setup.sh` 会请求 `/api/ai/mcp/workspaces`，要求从实际返回的工作空间中选择一个，不会在失败时猜测或默认绑定工作空间 ID。配置写入：
+`setup.sh` 会请求 `/api/v1/openapi/workspaces`，要求从实际返回的工作空间中选择一个，不会在失败时猜测或默认绑定工作空间 ID。配置写入：
 
 - `.lexiloom/config.json`：服务地址和工作空间信息，可在确认无秘密后提交。
 - `.lexiloom.env`：当前 MVP 的本地 API Key，必须加入 `.gitignore`，权限设置为仅当前用户可读写。
@@ -65,6 +65,6 @@ bash .agents/skills/lexiloom-hybrid-search/scripts/setup.sh
 ## 常见问题
 
 - **401/403**：检查 API Key 与工作空间访问权限。
-- **404**：确认后端已实现 `/api/ai/mcp/workspaces` 和 `/api/ai/mcp/search`。
+- **404**：确认后端已实现 `/api/v1/openapi/workspaces` 和 `/api/v1/openapi/search`。
 - **无法定位项目根目录**：请从目标仓库根目录运行 `setup.sh` 或检索脚本。
 - **Agent 未识别 Skill**：确认目标目录是否符合该 Agent 当前版本的 Skills 目录约定，并重启/刷新 Agent。
