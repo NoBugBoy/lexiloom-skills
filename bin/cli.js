@@ -32,20 +32,28 @@ const AGENTS = {
     project: (cwd) => path.join(cwd, '.agents', 'skills'),
     global: () => path.join(HOME, '.gemini', 'antigravity', 'skills'),
   },
+  pi: {
+    label: 'Pi',
+    project: (cwd) => path.join(cwd, '.pi', 'skills'),
+    global: () => path.join(HOME, '.pi', 'agent', 'skills'),
+  },
 };
 
 function usage() {
-  console.log(`LexiLoom Hybrid Search Skill installer\n\nUsage:\n  npx lexiloom-hybrid-search [options]\n\nOptions:\n  --scope project|global   Install scope (default: interactive)\n  --agent <list>           Agent names, comma-separated: codex,claude,gemini,antigravity\n  --uninstall              Remove the Skill from selected targets\n  --yes                    Do not ask for confirmation (requires --scope and --agent)\n  -h, --help               Show this help\n\nExamples:\n  npx lexiloom-hybrid-search\n  npx lexiloom-hybrid-search --scope project --agent codex,claude\n  npx lexiloom-hybrid-search --scope global --agent codex --uninstall`);
+  console.log(`LexiLoom Hybrid Search Skill installer\n\nUsage:\n  npx lexiloom-hybrid-search [options]\n\nOptions:\n  -g, --global             Install globally for all supported agents\n  --scope project|global   Install scope (default: interactive)\n  --agent <list>           Agent names, comma-separated: codex,claude,gemini,antigravity,pi\n  --uninstall              Remove the Skill from selected targets\n  --yes                    Do not ask for confirmation (requires --scope and --agent)\n  -h, --help               Show this help\n\nExamples:\n  npx lexiloom-hybrid-search\n  npx lexiloom-hybrid-search -g\n  npx lexiloom-hybrid-search --scope project --agent codex,claude\n  npx lexiloom-hybrid-search --scope global --agent pi --yes`);
 }
 
 function parseArgs(argv) {
-  const opts = { scope: '', agent: '', uninstall: false, yes: false, help: false };
+  const opts = { scope: '', agent: '', uninstall: false, yes: false, help: false, legacyGlobal: false };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--scope' || arg === '--agent') {
       const value = argv[++i];
       if (!value) throw new Error(`缺少 ${arg} 参数`);
       opts[arg.slice(2)] = value;
+    } else if (arg === '-g' || arg === '--global') {
+      opts.scope = 'global';
+      opts.legacyGlobal = true;
     } else if (arg === '--uninstall') opts.uninstall = true;
     else if (arg === '--yes' || arg === '-y') opts.yes = true;
     else if (arg === '--help' || arg === '-h') opts.help = true;
@@ -104,7 +112,7 @@ async function main() {
   if (opts.help) return usage();
   if (!fs.existsSync(SOURCE_DIR)) throw new Error(`找不到待安装的 Skill 文件：${SOURCE_DIR}`);
 
-  const interactive = !opts.yes && (!opts.scope || !opts.agent);
+  const interactive = !opts.legacyGlobal && !opts.yes && (!opts.scope || !opts.agent);
   const rl = interactive ? readline.createInterface({ input, output }) : null;
   try {
     const scope = opts.scope || await ask(rl, '安装范围：1) 当前项目  2) 当前用户全局', '1').then(v => ({ '1': 'project', '2': 'global', project: 'project', global: 'global' }[v] || ''));
@@ -112,6 +120,7 @@ async function main() {
 
     let agents;
     if (opts.agent) agents = parseAgents(opts.agent);
+    else if (opts.legacyGlobal) agents = Object.keys(AGENTS);
     else {
       console.log('\n可选 Agent：');
       Object.entries(AGENTS).forEach(([key, value], i) => console.log(`  ${i + 1}) ${value.label} (${key})`));

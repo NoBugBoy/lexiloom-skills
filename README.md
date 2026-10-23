@@ -17,11 +17,14 @@ npx lexiloom-hybrid-search --scope project --agent codex,claude --yes
 # 当前用户全局安装到 Codex
 npx lexiloom-hybrid-search --scope global --agent codex --yes
 
+# 兼容旧命令：安装到所有支持的 Agent 的全局目录（包括 Pi）
+npx lexiloom-hybrid-search -g
+
 # 卸载指定目标
 npx lexiloom-hybrid-search --scope project --agent codex --uninstall --yes
 ```
 
-支持的 Agent 参数：`codex`、`claude`、`gemini`、`antigravity`。
+支持的 Agent 参数：`codex`、`claude`、`gemini`、`antigravity`、`pi`。Pi 目标目录为项目级 `.pi/skills/` 和用户全局 `~/.pi/agent/skills/`。
 
 ## 安装目标目录
 
@@ -31,6 +34,7 @@ npx lexiloom-hybrid-search --scope project --agent codex --uninstall --yes
 | Claude Code | `.claude/skills/lexiloom-hybrid-search` | `~/.claude/skills/lexiloom-hybrid-search` |
 | Gemini CLI | `.gemini/skills/lexiloom-hybrid-search` | `~/.gemini/skills/lexiloom-hybrid-search` |
 | Antigravity | `.agents/skills/lexiloom-hybrid-search` | `~/.gemini/antigravity/skills/lexiloom-hybrid-search` |
+| Pi | `.pi/skills/lexiloom-hybrid-search` | `~/.pi/agent/skills/lexiloom-hybrid-search` |
 
 部分 Agent 的技能目录会重合（例如 Codex 和 Antigravity 的项目级目录）。安装器会对重复目标去重。
 
