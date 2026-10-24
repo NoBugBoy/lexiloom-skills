@@ -66,6 +66,7 @@ HTTP_CODE="$(curl --silent --show-error --get \
   --output "$TMP_BODY" --write-out '%{http_code}' \
   "$SERVER_URL/api/v1/openapi/knowledge/search" \
   --header "Authorization: Bearer $API_KEY" \
+  --header 'X-Call-Source: CLI_SKILL' \
   --header 'Accept: application/json' \
   --data-urlencode "q=$QUERY" --data-urlencode "workspaceId=$WORKSPACE_ID" --data-urlencode "topK=$TOP_K")"
 CURL_STATUS=$?

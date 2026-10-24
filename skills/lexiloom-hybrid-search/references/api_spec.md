@@ -5,6 +5,7 @@
 ## 1. 鉴权（MVP 现状）
 
 - 请求头：`Authorization: Bearer <API_KEY>`；如后端已支持，也可兼容 `X-API-Key`。
+- 知识库检索请求额外发送 `X-Call-Source: CLI_SKILL`，用于标识该检索来自本 Skill；工作空间发现和文档详情请求不发送此请求头。
 - OpenAPI Key 按 scope 控制接口权限：`/workspaces` 需要 `kb:read`，知识库检索需要 `kb:search`，文档详情需要 `doc:read`，对话补全需要 `chat:completion`。scope 不足时后端返回 HTTP `403`，ProblemDetail 的 `detail` 字段说明缺少的权限范围，例如 `当前 API Key 未授予 kb:search 权限范围`。
 - 后端权限校验也可能因工作空间白名单或用户/文档权限返回 `403`；客户端应优先展示 ProblemDetail 的 `detail`，不可用时再显示通用权限提示。`401` 表示凭证缺失、无效或未登录。
 - 客户端不得将 Key 写入可提交配置、日志或检索输出。项目级 `.lexiloom.env` 应加入 `.gitignore`，文件权限建议为 `600`。
