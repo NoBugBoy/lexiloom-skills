@@ -1,23 +1,27 @@
-# LexiLoom Hybrid Search — MVP API Contract
+# LexiLoom Hybrid Search — OpenAPI Contract Reference
 
-本文档描述 Skill 当前依赖的 REST API。路径中包含 `/mcp/` 并不代表这些端点本身就是 MCP 协议；MVP 通过 HTTP REST 调用，后续可增加 MCP Adapter 而不必改变检索语义。
+本文档描述本技能脚本（`scripts/*.sh`）所调用的 LexiLoom OpenAPI REST 接口契约，供排查接口异常或核对字段语义时参考。日常检索请直接调用 `scripts/` 下的脚本，不要手写包含明文 API Key 的请求。
 
-## 1. 鉴权（MVP 现状）
+## 1. 鉴权与安全约定
 
-- 请求头：`Authorization: Bearer <API_KEY>`；如后端已支持，也可兼容 `X-API-Key`。
-- 知识库检索请求额外发送 `X-Call-Source: CLI_SKILL`，用于标识该检索来自本 Skill；工作空间发现和文档详情请求不发送此请求头。
-- OpenAPI Key 按 scope 控制接口权限：`/workspaces` 需要 `kb:read`，知识库检索需要 `kb:search`，文档详情需要 `doc:read`，对话补全需要 `chat:completion`。scope 不足时后端返回 HTTP `403`，ProblemDetail 的 `detail` 字段说明缺少的权限范围，例如 `当前 API Key 未授予 kb:search 权限范围`。
-- 后端权限校验也可能因工作空间白名单或用户/文档权限返回 `403`；客户端应优先展示 ProblemDetail 的 `detail`，不可用时再显示通用权限提示。`401` 表示凭证缺失、无效或未登录。
-- 客户端不得将 Key 写入可提交配置、日志或检索输出。项目级 `.lexiloom.env` 应加入 `.gitignore`，文件权限建议为 `600`。
-- `LEXILOOM_API_KEY` 环境变量优先于 `.lexiloom.env`。
+- 请求头：`Authorization: Bearer <API_KEY>`（脚本通过 `curl --config -` 从标准输入传入，避免在进程列表中暴露命令参数）。
+- 知识库检索请求额外发送 `X-Call-Source: CLI_SKILL`，用于标识该检索来自 CLI Skill；工作空间发现和文档详情请求不发送此请求头。
+- OpenAPI Key 按 scope 控制接口权限：
+  - `/api/v1/openapi/workspaces`：需要 `kb:read`
+  - `/api/v1/openapi/knowledge/search`：需要 `kb:search`
+  - `/api/v1/openapi/documents/{id}`：需要 `doc:read`
+  - 对话补全：需要 `chat:completion`
+- 当 scope 不足、工作空间不在白名单或文档无权限时，后端返回 HTTP `403`，并在 RFC 7807 ProblemDetail 的 `detail` 字段说明具体原因（例如 `当前 API Key 未授予 kb:search 权限范围`）。脚本会优先提取并展示该字段。
+- `401` 表示凭证缺失、无效或已过期。
+- 本地凭证存储在目标仓库根目录的 `.lexiloom.env`（权限 `600`，加入 `.gitignore`），环境变量 `LEXILOOM_API_KEY` 优先级高于 `.lexiloom.env`。
 
 ## 2. 工作空间列表
 
 `GET /api/v1/openapi/workspaces`
 
-用途：初始化时列出当前凭证可访问的工作空间，用户必须选择服务端实际返回的 ID。客户端不得在失败时猜测 ID 或静默使用 `1`。
+用途：初始化（`setup.sh`）时列出当前凭证可访问的工作空间，用户必须选择服务端实际返回的 ID。客户端不得在失败时猜测 ID 或静默绑定默认 ID。
 
-期望响应：
+期望响应（兼容顶层数组或 `{ "data": [...] }` 包装格式）：
 
 ```json
 [
@@ -25,20 +29,18 @@
 ]
 ```
 
-若后端使用包装格式 `{ "data": [...] }`，客户端可兼容。返回 `200` 但列表为空时应停止初始化。
-
 ## 3. 知识库切片检索
 
-推荐使用 `POST /api/v1/openapi/knowledge/search`（后端同时支持 `GET /api/v1/openapi/knowledge/search`，脚本使用 GET 便于命令行联调）。
+`GET /api/v1/openapi/knowledge/search`（后端同时支持 `POST`）
 
 | 参数 | 类型 | 必填 | 默认值 | 说明 |
 |---|---|---:|---:|---|
-| `q` | string | 是 | — | 自然语言查询 |
-| `workspaceId` | integer | 建议 | 项目绑定空间 | 工作空间 ID |
-| `topK` | integer | 否 | 5 | 返回条数，MVP 客户端限制为 1–20 |
-| `minScore` | number | 否 | 后端默认 | 可选相似度阈值；当前脚本不传 |
+| `q` | string | 是 | — | 自然语言查询问题 |
+| `workspaceId` | integer | 是 | 项目绑定空间 | 工作空间 ID |
+| `topK` | integer | 否 | 5 | 返回条数，脚本限制为 1–20 |
+| `minScore` | number | 否 | 后端默认 | 可选相似度阈值 |
 
-推荐响应：
+期望响应（兼容顶层对象、顶层数组以及 `{ "data": { "results": [...] } }` 包装响应）：
 
 ```json
 {
@@ -59,13 +61,13 @@
 }
 ```
 
-客户端兼容顶层数组以及 `{ "data": { "results": [...] } }` 包装响应。`score` 是检索系统的相关度指标，不是事实正确率或置信概率。
+`score` 是检索系统的相关度排序指标，不是事实正确率或置信概率。
 
 ## 4. 文档详情
 
 `GET /api/v1/openapi/documents/{id}`
 
-用于根据切片结果中的 `documentId` 按需读取单篇文档详情。后端 `McpDocumentDetailVO` 的真实字段为：
+用于根据切片结果中的 `documentId` 按需读取单篇文档完整正文与元数据：
 
 | 字段 | 类型 | 含义 |
 |---|---|---|
@@ -75,31 +77,21 @@
 | `categoryName` | string | 分类名称 |
 | `status` | string | 文档状态 |
 | `version` | integer | 当前版本号 |
-| `content` | string | 文档正文 |
+| `content` | string | 文档 Markdown 正文 |
 | `createTime` | string | 创建时间 |
 | `updateTime` | string | 更新时间 |
 
-详情以 JSON 对象直接返回（不是 `data` 包装）。`scripts/get_document.sh <documentId>` 保留并展示这些实际字段及完整 `content`。客户端不应自行重命名或推导版本状态字段。
+`scripts/get_document.sh <documentId> [maxChars]` 保留并展示上述元数据字段及正文 `content`（默认超过 30000 字符时友好截断并提示，传 `0` 可输出不截断全文）。
 
-Skill 应先通过 `/knowledge/search` 获得 `documentId`，再按需请求详情，并将切片与全文核对。`403` 表示无权限；`404` 可能是文档不存在，也可能是端点未部署或路径不匹配，客户端无法仅凭状态码区分。
+## 5. 错误状态码语义
 
-## 5. 错误语义
-
-| HTTP | 客户端处理 |
+| HTTP | 客户端处理建议 |
 |---|---|
-| `200` | 校验 JSON 格式后处理结果 |
-| `400` | 参数错误；提示检查 query/topK/workspaceId |
+| `200` | 校验 JSON 结构后展示结果 |
+| `400` | 参数错误；提示检查 `q` / `topK` / `workspaceId` / `documentId` |
 | `401` | 凭证缺失或无效 |
-| `403` | 凭证无权访问目标工作空间 |
-| `404` | 资源不存在，或端点未部署/路径不匹配；结合请求路径排查 |
-| `429` | 限流；稍后重试 |
-| `5xx` | 服务端异常；检查服务日志 |
-| 网络错误/超时 | 检查 URL、网络与服务健康状态 |
-
-错误响应不得将凭证或完整敏感响应体输出到终端。建议连接超时 5 秒、总超时 20–30 秒。
-
-## 6. MVP 范围与后续项
-
-当前范围：REST 检索、项目绑定配置、本地代码搜索、基础错误处理。
-
-暂不实现：独立 Agent Key 管理、OAuth、自动轮转、复杂权限 UI、真正的 MCP Server。后续新增 MCP Adapter 时，可复用同一检索服务与响应字段。
+| `403` | 凭证缺少对应 scope 或无权访问目标工作空间/文档 |
+| `404` | 资源不存在，或对应端点未部署/路径不匹配 |
+| `429` | 触发限流；稍后重试 |
+| `5xx` | 服务端异常；提示检查后端服务日志 |
+| 网络错误/超时 | 提示检查 `serverUrl`、网络连接与服务健康状态（连接超时 5s，总超时 20–30s） |

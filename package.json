@@ -1,19 +1,40 @@
 {
   "name": "lexiloom-hybrid-search",
-  "version": "1.0.0",
-  "description": "Install the LexiLoom hybrid-search Agent Skill into supported coding agents",
+  "version": "1.1.0",
+  "description": "Install LexiLoom Agent Skills into mainstream coding agents (Codex, Claude Code, Cursor, Windsurf, Copilot, Gemini CLI, Antigravity, Cline, Roo Code, OpenCode, Trae, Goose, Pi)",
   "license": "MIT",
   "type": "commonjs",
   "bin": {
-    "lexiloom-hybrid-search": "bin/cli.js"
+    "lexiloom-hybrid-search": "bin/cli.js",
+    "lexiloom-skills": "bin/cli.js"
   },
   "files": [
     "bin/cli.js",
-    "skills/lexiloom-hybrid-search/**",
-    "README.md"
+    "skills/**",
+    "README.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=18"
   },
-  "keywords": ["agent-skill", "lexiloom", "hybrid-search", "codex", "claude-code"]
+  "keywords": [
+    "agent-skills",
+    "agent-skill",
+    "lexiloom",
+    "hybrid-search",
+    "knowledge-base",
+    "codex",
+    "claude-code",
+    "cursor",
+    "windsurf",
+    "github-copilot",
+    "gemini-cli",
+    "antigravity",
+    "cline",
+    "roo-code",
+    "opencode",
+    "trae",
+    "goose",
+    "pi"
+  ]
 }
