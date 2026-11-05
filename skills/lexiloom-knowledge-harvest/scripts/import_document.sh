@@ -111,7 +111,7 @@ SUPPORTED_EXTS="^(pdf|docx|doc|xlsx|xls|pptx|ppt|txt|md|csv|tsv|html|htm|json)$"
 if [[ ! "$EXT_LOWER" =~ $SUPPORTED_EXTS ]]; then
   echo "错误：不支持的文件类型 (.$EXT)。" >&2
   echo "支持的格式包含: .pdf, .docx, .doc, .xlsx, .xls, .pptx, .ppt, .txt, .md, .csv, .tsv, .html, .htm, .json" >&2
-  echo "对于零散碎片内容，建议整理、提炼并合并为一个高质量的 .md 文件后再执行导入。" >&2
+  echo "对于零散纯文本内容，建议整理、提炼并合并为一个高质量的 .md 文件后再执行导入；若涉及截图或图片，强烈推荐使用 .pdf 或 .docx (Word)。" >&2
   exit 2
 fi
 
