@@ -33,15 +33,38 @@ API_KEY="$(load_api_key "$ENV_FILE")"
 TMP_BODY="$(mktemp)"
 trap 'rm -f "$TMP_BODY"' EXIT
 
+JSON_PAYLOAD="$(python3 - "$QUERY" "$WORKSPACE_ID" "$TOP_K" <<'PY'
+import json, sys
+q, wid, topk = sys.argv[1:4]
+print(json.dumps({
+    "q": q,
+    "workspaceId": int(wid),
+    "topK": int(topk)
+}, ensure_ascii=False))
+PY
+)"
+
 set +e
-HTTP_CODE="$(lexiloom_curl_get "$TMP_BODY" "$API_KEY" 5 30 \
+# 优先使用 POST 发送 JSON 请求体（LexiLoom 官方推荐，避免长 Query 被截断及 URL 泄露）
+HTTP_CODE="$(lexiloom_curl_post "$TMP_BODY" "$API_KEY" 5 30 \
   "$SERVER_URL/api/v1/openapi/knowledge/search" \
-  --header 'X-Call-Source: CLI_SKILL' \
-  --data-urlencode "q=$QUERY" \
-  --data-urlencode "workspaceId=$WORKSPACE_ID" \
-  --data-urlencode "topK=$TOP_K")"
+  "$JSON_PAYLOAD" \
+  --header 'X-Call-Source: CLI_SKILL')"
 CURL_STATUS=$?
 set -e
+
+# 若 POST 返回 405 Method Not Allowed 或 404，平滑降级为 GET 请求以保障最大兼容性
+if (( CURL_STATUS == 0 )) && [[ "$HTTP_CODE" == "405" || "$HTTP_CODE" == "404" ]]; then
+  set +e
+  HTTP_CODE="$(lexiloom_curl_get "$TMP_BODY" "$API_KEY" 5 30 \
+    "$SERVER_URL/api/v1/openapi/knowledge/search" \
+    --header 'X-Call-Source: CLI_SKILL' \
+    --data-urlencode "q=$QUERY" \
+    --data-urlencode "workspaceId=$WORKSPACE_ID" \
+    --data-urlencode "topK=$TOP_K")"
+  CURL_STATUS=$?
+  set -e
+fi
 
 if (( CURL_STATUS != 0 )); then
   echo "知识库检索请求失败：网络错误或请求超时（curl exit=$CURL_STATUS）。请检查服务地址和网络。" >&2
@@ -77,7 +100,7 @@ case "$HTTP_CODE" in
 esac
 
 python3 - "$TMP_BODY" "$WORKSPACE_ID" "$WORKSPACE_NAME" <<'PY'
-import json, sys
+import json, re, sys
 
 path, workspace_id, workspace_name = sys.argv[1:]
 try:
@@ -87,16 +110,24 @@ except Exception:
     print('错误：服务端返回的不是有效 JSON。', file=sys.stderr)
     sys.exit(1)
 
+trace_id = None
+total_matches = None
+
 if isinstance(data, dict):
     results = data.get('results')
+    trace_id = data.get('traceId')
+    total_matches = data.get('totalMatches')
     if results is None and isinstance(data.get('data'), dict):
         results = data['data'].get('results')
+        trace_id = trace_id or data['data'].get('traceId')
+        total_matches = total_matches if total_matches is not None else data['data'].get('totalMatches')
     if results is None and isinstance(data.get('data'), list):
         results = data['data']
     if results is None:
         results = []
 elif isinstance(data, list):
     results = data
+    total_matches = len(data)
 else:
     results = []
 
@@ -104,28 +135,49 @@ if not isinstance(results, list):
     print('错误：响应中的 results 字段格式不正确。', file=sys.stderr)
     sys.exit(1)
 
+trace_str = f' | 链路 Trace ID: {trace_id}' if trace_id else ''
+total_str = f' (匹配总数: {total_matches})' if total_matches is not None else ''
 print(f'知识库检索：{workspace_name or "未命名工作空间"}（ID: {workspace_id}）')
-print(f'返回 {len(results)} 条切片。\n')
+print(f'返回 {len(results)} 条切片{total_str}{trace_str}。\n')
 if not results:
-    print('未检索到相关切片。可尝试换一种问法，或确认相关文档已入库。')
+    print('未检索到相关切片。建议：')
+    print('  1. 提炼核心业务关键词/领域实体术语（避免直接输入整句口语提问）；')
+    print('  2. 适当增大 topK（如 10）；')
+    print('  3. 确认相关文档已入库并完成 AI 索引。')
 
 for i, item in enumerate(results, 1):
     if not isinstance(item, dict):
         continue
     title = item.get('documentTitle') or '无标题'
+    category = item.get('categoryName') or '未分类'
     doc_id = item.get('documentId', '未知')
     chunk = item.get('chunkIndex', '未知')
     page = item.get('pageNumber')
     score = item.get('score')
-    meta = f'{i}. 文档：《{title}》 | 文档 ID: {doc_id} | 切片: {chunk}'
+    coords = item.get('deepDocCoordinates')
+
+    meta = f'{i}. 文档：《{title}》 [{category}] | 文档 ID: {doc_id} | 切片: {chunk}'
     if page is not None:
         meta += f' | 页码: {page}'
-    meta += f' | 得分: {score if score is not None else "未提供"}'
-    content = ' '.join(str(item.get('content') or '').split())
+    if score is not None:
+        meta += f' | 得分: {score}'
+    if coords and coords != '[]' and coords != 'null':
+        meta += f' | 视觉坐标: {coords}'
+
+    raw_content = str(item.get('content') or '').strip()
+    # 规整连续空行，同时保留 Markdown 列表、表格与代码块缩进结构
+    clean_content = re.sub(r'\n{3,}', '\n\n', raw_content)
+
     print(meta)
-    if len(content) > 1800:
-        print(f'   {content[:1800]}... [切片内容已截断，可通过 get_document.sh {doc_id} 读取全文]')
+    if not clean_content:
+        print('   [空切片正文]')
+    elif len(clean_content) > 2000:
+        snippet = clean_content[:2000]
+        indented = '\n'.join('   ' + line for line in snippet.splitlines())
+        print(indented)
+        print(f'   ... [切片内容已截断，可通过 get_document.sh {doc_id} 读取完整文档]')
     else:
-        print(f'   {content}')
+        indented = '\n'.join('   ' + line for line in clean_content.splitlines())
+        print(indented)
     print()
 PY

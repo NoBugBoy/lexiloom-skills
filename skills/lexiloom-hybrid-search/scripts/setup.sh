@@ -140,7 +140,12 @@ except Exception as e:
     sys.exit(2)
 for w in d:
     desc = f" — {w['description']}" if w.get('description') else ''
-    print(f"  [{w['id']}] {w['name']}{desc}")
+    total_docs = w.get('totalDocuments')
+    total_chunks = w.get('totalChunks')
+    stats = ""
+    if total_docs is not None:
+        stats = f" ({total_docs} 篇文档" + (f", {total_chunks} 个切片)" if total_chunks is not None else ")")
+    print(f"  [{w['id']}] {w['name']}{desc}{stats}")
 PY
 
 # Read valid IDs and select one explicitly; never silently bind to ID=1.

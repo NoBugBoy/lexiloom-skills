@@ -161,5 +161,33 @@ lexiloom_curl_get() {
     "$@" \
     "$url" <<EOF
 header = "Authorization: Bearer ${api_key//\"/\\\"}"
+header = "X-API-Key: ${api_key//\"/\\\"}"
+EOF
+}
+
+# Perform an authenticated POST request with JSON payload without exposing the API key in process arguments.
+# Usage: lexiloom_curl_post <output_file> <api_key> <connect_timeout> <max_time> <url> <json_payload> [extra_curl_args...]
+lexiloom_curl_post() {
+  local output_file="$1"
+  local api_key="$2"
+  local connect_timeout="$3"
+  local max_time="$4"
+  local url="$5"
+  local json_payload="$6"
+  shift 6
+
+  curl --silent --show-error \
+    --connect-timeout "$connect_timeout" \
+    --max-time "$max_time" \
+    --output "$output_file" \
+    --write-out '%{http_code}' \
+    --header 'Content-Type: application/json' \
+    --header 'Accept: application/json' \
+    --data "$json_payload" \
+    --config - \
+    "$@" \
+    "$url" <<EOF
+header = "Authorization: Bearer ${api_key//\"/\\\"}"
+header = "X-API-Key: ${api_key//\"/\\\"}"
 EOF
 }
