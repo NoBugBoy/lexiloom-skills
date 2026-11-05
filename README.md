@@ -44,7 +44,7 @@ npx lexiloom-hybrid-search --scope project --agent codex --uninstall --yes
 | Skill 标识 | 技能名称 | 核心能力与适用场景 |
 |---|---|---|
 | `lexiloom-hybrid-search` | 混合检索与双侧对齐 | 结合本地源码与 LexiLoom 知识库（PRD、架构设计、业务规范）进行多源检索与一致性交叉核对。 |
-| `lexiloom-knowledge-harvest` | 知识采集与审查入库 | 对零散碎片知识（群聊记录、需求碎语、测试用例、网页 URL 等）进行智能研判、噪声清洗、敏感脱敏、提炼重塑为结构化文档（纯文本优先 `.md`，涉及图片优先使用 `.pdf` 或 `.docx`），并通过 `POST /api/v1/openapi/documents/import` 安全导入知识库。 |
+| `lexiloom-knowledge-harvest` | 知识采集与审查入库 | 对零散碎片知识（群聊记录、需求碎语、测试用例、网页 URL 等）进行智能研判、噪声清洗、敏感脱敏、提炼重塑为结构化文档（纯文本优先 `.md`，涉及图片优先使用 `.pdf` 或 `.docx`，合并文件名推荐中文），并通过 `POST /api/v1/openapi/documents/import` 安全导入知识库。 |
 
 ## 支持的编码 Agent 与安装目录
 
