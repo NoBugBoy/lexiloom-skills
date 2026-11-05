@@ -37,6 +37,15 @@ npx lexiloom-hybrid-search --scope project --agent codex --uninstall --yes
 
 此外，本仓库目录结构遵循标准 Agent Skills 规范（`skills/<skill-name>/SKILL.md`），同样兼容社区通用技能安装器（如 `npx skills add <owner>/<repo>`）。
 
+## 包含的核心 Agent Skills
+
+本库提供面向 LexiLoom 企业级知识库的一体化 Agent Skills 集合：
+
+| Skill 标识 | 技能名称 | 核心能力与适用场景 |
+|---|---|---|
+| `lexiloom-hybrid-search` | 混合检索与双侧对齐 | 结合本地源码与 LexiLoom 知识库（PRD、架构设计、业务规范）进行多源检索与一致性交叉核对。 |
+| `lexiloom-knowledge-harvest` | 知识采集与审查入库 | 对零散碎片知识（群聊记录、需求碎语、测试用例、网页 URL 等）进行智能研判、噪声清洗、敏感脱敏、提炼重塑为结构化 `.md`，并通过 `POST /api/v1/openapi/documents/import` 安全导入知识库。 |
+
 ## 支持的编码 Agent 与安装目录
 
 支持传入 `--agent <name1,name2>` 或 `--agent all`：
@@ -95,5 +104,5 @@ bash .agents/skills/lexiloom-hybrid-search/scripts/setup.sh \
 ## 常见问题
 
 - **401 / 403**：`401` 为凭证缺失或无效；`403` 为 API Key 缺少对应 scope（`kb:read`、`kb:search`、`doc:read`）、工作空间白名单限制或文档权限不足。脚本会优先展示后端 ProblemDetail 返回的具体原因。
-- **404**：请确认后端已部署 `/api/v1/openapi/workspaces`、`/api/v1/openapi/knowledge/search` 及 `/api/v1/openapi/documents/{id}`。
+- **404**：请确认后端已部署 `/api/v1/openapi/workspaces`、`/api/v1/openapi/knowledge/search`、`/api/v1/openapi/documents/{id}` 及 `/api/v1/openapi/documents/import`。
 - **Agent 未识别 Skill**：确认目标目录符合对应 Agent 当前版本的 Skills 目录约定，并在安装后刷新或重启 Agent 会话。
