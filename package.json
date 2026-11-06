@@ -1,7 +1,7 @@
 {
   "name": "lexiloom-hybrid-search",
-  "version": "1.2.0",
-  "description": "Install LexiLoom Agent Skills into mainstream coding agents (Codex, Claude Code, Cursor, Windsurf, Copilot, Gemini CLI, Antigravity, Cline, Roo Code, OpenCode, Trae, Goose, Pi)",
+  "version": "1.3.0",
+  "description": "Install LexiLoom Agent Skills into mainstream coding agents (Codex, Claude Code, Cursor, Windsurf, Copilot, Gemini CLI, Antigravity, Cline, Roo Code, OpenCode, Trae, Goose, Pi, Qoder, CodeBuddy, Qwen Code, Kimi Code CLI)",
   "license": "MIT",
   "type": "commonjs",
   "bin": {
@@ -40,6 +40,11 @@
     "opencode",
     "trae",
     "goose",
-    "pi"
+    "pi",
+    "qoder",
+    "qoder-cn",
+    "codebuddy",
+    "qwen-code",
+    "kimi-code-cli"
   ]
 }

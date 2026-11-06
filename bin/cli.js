@@ -79,6 +79,31 @@ const AGENTS = {
     project: (cwd) => path.join(cwd, '.pi', 'skills'),
     global: () => path.join(HOME, '.pi', 'agent', 'skills'),
   },
+  qoder: {
+    label: 'Qoder',
+    project: (cwd) => path.join(cwd, '.qoder', 'skills'),
+    global: () => path.join(HOME, '.qoder', 'skills'),
+  },
+  'qoder-cn': {
+    label: 'Qoder CN',
+    project: (cwd) => path.join(cwd, '.qoder', 'skills'),
+    global: () => path.join(HOME, '.qoder-cn', 'skills'),
+  },
+  codebuddy: {
+    label: 'CodeBuddy',
+    project: (cwd) => path.join(cwd, '.codebuddy', 'skills'),
+    global: () => path.join(HOME, '.codebuddy', 'skills'),
+  },
+  'qwen-code': {
+    label: 'Qwen Code',
+    project: (cwd) => path.join(cwd, '.qwen', 'skills'),
+    global: () => path.join(HOME, '.qwen', 'skills'),
+  },
+  'kimi-code-cli': {
+    label: 'Kimi Code CLI',
+    project: (cwd) => path.join(cwd, '.agents', 'skills'),
+    global: () => path.join(HOME, '.agents', 'skills'),
+  },
 };
 
 function discoverSkills() {
@@ -345,7 +370,7 @@ async function main() {
   try {
     const scope =
       opts.scope ||
-      (await ask(rl, '安装范围：1) 当前项目  2) 当前用户全局', '1').then(
+      (await ask(rl, '安装范围：1) [项目级] 仅当前项目(推荐)  2) [全局级] 本机用户全局共享', '1').then(
         (v) => ({ '1': 'project', '2': 'global', project: 'project', global: 'global' }[v] || '')
       ));
     if (!['project', 'global'].includes(scope)) {
