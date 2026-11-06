@@ -1,6 +1,6 @@
 {
   "name": "lexiloom-hybrid-search",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Install LexiLoom Agent Skills into mainstream coding agents (Codex, Claude Code, Cursor, Windsurf, Copilot, Gemini CLI, Antigravity, Cline, Roo Code, OpenCode, Trae, Goose, Pi)",
   "license": "MIT",
   "type": "commonjs",
@@ -24,6 +24,8 @@
     "hybrid-search",
     "knowledge-harvest",
     "knowledge-collector",
+    "workspace-manager",
+    "switch-workspace",
     "document-import",
     "knowledge-base",
     "codex",

@@ -45,6 +45,7 @@ npx lexiloom-hybrid-search --scope project --agent codex --uninstall --yes
 |---|---|---|
 | `lexiloom-hybrid-search` | 混合检索与双侧对齐 | 结合本地源码与 LexiLoom 知识库（PRD、架构设计、业务规范）进行多源检索与一致性交叉核对。 |
 | `lexiloom-knowledge-harvest` | 知识采集与审查入库 | 对零散碎片知识（群聊记录、需求碎语、测试用例、网页 URL 等）进行智能研判、噪声清洗、敏感脱敏、提炼重塑为结构化文档（纯文本优先 `.md`，涉及图片优先使用 `.pdf` 或 `.docx`，合并文件名推荐中文），并通过 `POST /api/v1/openapi/documents/import` 安全导入知识库。 |
+| `lexiloom-workspace-manager` | 空间与凭证动态管理 | 提供**切换工作空间**与**切换 AccessKey**两大核心指令。支持实时查询当前 Key 所见的所有可用空间供用户交互选择，切换 AccessKey 时自动探测凭证有效性并固定强制触发选择空间流程，无须重启 Agent 即刻在当前会话生效。 |
 
 ## 支持的编码 Agent 与安装目录
 
@@ -70,34 +71,49 @@ npx lexiloom-hybrid-search --scope project --agent codex --uninstall --yes
 
 ## 配置 LexiLoom 工作空间绑定
 
-默认安装流程会在安装完成后自动运行 `setup.sh`（若在非代码仓库目录执行全局安装，或处于无 TTY 的非交互环境，会自动跳过并提示）。也可以在**目标代码仓库根目录（或子目录）**单独运行：
+默认安装流程会在安装完成后自动运行 `setup.js`（若在非代码仓库目录执行全局安装，或处于无 TTY 的非交互环境，会自动跳过并提示）。也可以在**目标代码仓库根目录（或子目录）**单独运行：
 
 ```bash
 # 交互式向导
 npx lexiloom-hybrid-search --only-setup
 
-# 或直接调用脚本（支持交互式或传参/环境变量非交互式配置）
-bash .agents/skills/lexiloom-hybrid-search/scripts/setup.sh \
+# 或直接调用脚本（支持交互式或传参/环境变量非交互式配置，零 Python 依赖）
+node .agents/skills/lexiloom-hybrid-search/scripts/setup.js \
   --url http://localhost:8080 \
   --workspace-id 1
 ```
 
-`setup.sh` 会请求 `/api/v1/openapi/workspaces`，校验所选工作空间 ID 是否存在于服务端实际返回列表中（绝不在失败时猜测或静默绑定默认 ID）。配置完成后生成：
+`setup.js` 会请求 `/api/v1/openapi/workspaces`，校验所选工作空间 ID 是否存在于服务端实际返回列表中（绝不在失败时猜测或静默绑定默认 ID）。配置完成后生成：
 
 - `.lexiloom/config.json`：服务地址、绑定的工作空间信息及代码检索排除规则，确认无敏感信息后可提交版本库。
 - `.lexiloom.env`：本地 API Key（权限自动设为 `600`，并自动确保写入 `.gitignore`）。
 
 运行时 `LEXILOOM_API_KEY` 环境变量优先级高于 `.lexiloom.env`。
 
+### 动态切换工作空间与 AccessKey
+
+在日常开发与对话中，可通过新增的 `lexiloom-workspace-manager` 技能直接用自然语言（例如“帮我换个空间”、“切换 accesskey”）触发，或在项目根目录运行管理脚本：
+
+```bash
+# 1. 查询当前凭证可见的所有工作空间
+python3 skills/lexiloom-workspace-manager/scripts/manage_workspace.py list-workspaces
+
+# 2. 切换至指定的工作空间（立刻在当前会话生效）
+python3 skills/lexiloom-workspace-manager/scripts/manage_workspace.py set-workspace --workspace-id 2
+
+# 3. 切换 AccessKey（自动探测验证，并立刻强制返回该 Key 可见工作空间供选择）
+python3 skills/lexiloom-workspace-manager/scripts/manage_workspace.py set-api-key --api-key <新Key>
+```
+
 ## 运行要求
 
-- **Node.js 18+**：运行 `npx` 安装器。
-- **Bash、Python 3、curl**：运行配置向导与知识库检索脚本。
-- **ripgrep (`rg`)**（推荐，可选）：加速本地代码搜索；未安装时自动降级为 `grep`。
+- **Node.js 18+**：支持原生 `fetch`、`FormData` 与 `Blob`。所有技能脚本均采用 **Node.js 原生零依赖**单文件实现，不需要安装任何第三方 npm 包，**不需要 Python 3，不需要 curl**，完全原生支持 macOS、Linux 及 Windows（CMD / PowerShell）。
+- **ripgrep (`rg`)**（推荐，可选）：加速本地代码搜索；未安装时自动降级为系统 `grep`。
 
 ## 安全与边界说明
 
-- **进程参数防泄露**：检索脚本通过 `curl --config -` 从标准输入传递 `Authorization` 请求头，避免 API Key 暴露在系统进程列表（`ps aux`）中。
+- **全平台跨环境一致性**：核心脚本摆脱系统 Shell 与 Python 版本不一致的困扰，统一由 Node.js 运行时执行。
+- **进程参数防泄露**：请求通过 HTTP 标头在进程内直接传递 `Authorization` 与 `X-API-Key`，不会暴露在系统进程列表（`ps aux`）中。
 - **安全覆盖保护**：更新或卸载时仅操作包含 `SKILL.md` 的有效技能目录，且拒绝跟随或删除软链接目录，防止误删用户数据。
 - **多模块/Monorepo 根目录定位**：脚本按 `.lexiloom` → `.git` → 构建描述文件（`pom.xml`/`package.json` 等）的优先级多轮向上查找，确保在子模块目录执行时仍能准确定位仓库根配置。
 

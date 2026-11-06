@@ -244,23 +244,31 @@ function hasProjectRootMarker(startDir) {
 }
 
 function findSetupScript(targets = [], availableSkills = new Map()) {
-  const candidates = [
-    ...targets.map((target) => path.join(target, 'scripts', 'setup.sh')),
-    ...Object.values(AGENTS).map((agent) =>
-      path.join(agent.project(process.cwd()), DEFAULT_SKILL, 'scripts', 'setup.sh')
-    ),
-  ];
-  for (const skill of availableSkills.values()) {
-    candidates.push(path.join(skill.dir, 'scripts', 'setup.sh'));
+  const scriptNames = ['setup.js', 'setup.sh'];
+  for (const scriptName of scriptNames) {
+    const candidates = [
+      ...targets.map((target) => path.join(target, 'scripts', scriptName)),
+      ...Object.values(AGENTS).map((agent) =>
+        path.join(agent.project(process.cwd()), DEFAULT_SKILL, 'scripts', scriptName)
+      ),
+    ];
+    for (const skill of availableSkills.values()) {
+      candidates.push(path.join(skill.dir, 'scripts', scriptName));
+    }
+    const found = candidates.find((candidate) => fs.existsSync(candidate));
+    if (found) return found;
   }
-  return candidates.find((candidate) => fs.existsSync(candidate));
+  return null;
 }
 
 function runSetup(targets, availableSkills) {
   const setupScript = findSetupScript(targets, availableSkills);
-  if (!setupScript) throw new Error('未找到 setup.sh 引导脚本，请检查技能安装完整性');
+  if (!setupScript) throw new Error('未找到 setup 引导脚本，请检查技能安装完整性');
   fs.chmodSync(setupScript, 0o755);
-  const result = spawnSync('bash', [setupScript], {
+
+  const isJs = setupScript.endsWith('.js');
+  const runner = isJs ? process.execPath : 'bash';
+  const result = spawnSync(runner, [setupScript], {
     stdio: 'inherit',
     cwd: process.cwd(),
   });

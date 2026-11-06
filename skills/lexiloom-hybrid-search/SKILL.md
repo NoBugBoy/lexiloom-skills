@@ -10,7 +10,7 @@ description: >-
 
 深度结合**本地代码证据**与 **LexiLoom 知识库证据**解决业务与技术对齐问题。不要为了凑齐两类结果而进行泛化检索；根据问题性质精准选择代码检索、知识库检索或双侧交叉核对。
 
-> **脚本路径约定**：下文中 `<SKILL_DIR>` 指代当前 `SKILL.md` 所在的目录路径。由于 Agent 执行 Shell 命令时的工作目录（`PWD`）通常是**目标代码仓库根目录**而非技能目录，调用脚本时请始终使用 `<SKILL_DIR>/scripts/...` 完整路径（但在**目标代码仓库目录**下运行命令，以便脚本自动定位 `.lexiloom/config.json`）。当排查知识库连接、8080 端口、鉴权或超时时，必须使用本 Skill 的鉴权封装脚本，严禁执行包含明文凭据的原始 curl 命令。
+> **脚本路径约定**：下文中 `<SKILL_DIR>` 指代当前 `SKILL.md` 所在的目录路径。由于 Agent 执行命令时的工作目录（`PWD`）通常是**目标代码仓库根目录**而非技能目录，调用脚本时请始终使用 `node "<SKILL_DIR>/scripts/..."` 形式（零三方依赖，开箱即用，原生兼容所有操作系统；同时保留有同名 `.sh` 薄包装脚本供兼容）。当排查知识库连接、8080 端口、鉴权或超时时，必须使用本 Skill 的鉴权封装脚本，严禁执行包含明文凭据的原始 curl 命令。
 
 ---
 
@@ -43,7 +43,7 @@ description: >-
 
 - 检查目标代码仓库根目录是否存在 `.lexiloom/config.json`。
 - 若未配置，引导用户在目标代码仓库根目录执行初始化绑定：
-  `bash "<SKILL_DIR>/scripts/setup.sh"`（支持交互式选择服务端实际返回的工作空间列表）。
+  `node "<SKILL_DIR>/scripts/setup.js"`（支持交互式选择服务端实际返回的工作空间列表）。
 - 凭证由 `LEXILOOM_API_KEY` 环境变量或 `.lexiloom.env` 提供。**严禁以任何形式打印、回显或读取 `.lexiloom.env` 的明文内容**。
 
 ### 3. 高质量提炼与执行知识库检索
@@ -54,7 +54,7 @@ description: >-
   * **多维度覆盖**：若初次检索切片不足，进行渐进式改写（提取上位概念、同义词，或适当增大 `topK` 至 8–15），避免使用完全相同的查询词重复调用。
 - **调用检索脚本**：
   ```bash
-  bash "<SKILL_DIR>/scripts/search_knowledge.sh" '<提炼后的自然语言问题>' [topK，默认5，范围1-20]
+  node "<SKILL_DIR>/scripts/search_knowledge.js" '<提炼后的自然语言问题>' [topK，默认5，范围1-20]
   ```
 - **记录关键线索**：记录匹配结果的 `documentTitle`、`categoryName`、`documentId`、`chunkIndex`、`score` 及正文核心条款。
 
@@ -62,22 +62,22 @@ description: >-
 
 - **何时仅凭切片即可作答（高效模式）**：
   * 切片内容自包含、定义明确，如单个参数说明、固定阈值、特定状态码说明或简单规则计算公式。
-- **何时必须调用 `get_document.sh` 通读全文（下钻模式）**：
+- **何时必须调用 `get_document.js` 通读全文（下钻模式）**：
   * **依赖外部上下文**：切片中出现“根据前文所述”、“满足上述第 2 节前置条件”或“例外情况见下文”等衔接词；
   * **结构截断**：切片中的业务流程图截断、状态转移表缺少关键跃迁行、或枚举值列表未闭合；
-  * **⚠️ 发现疑似代码冲突时必须查验全文**：当切片内容与本地代码实现不一致时，**切勿轻易下达“代码存在 Bug”或“未遵循规范”的武断结论**！必须调用 `get_document.sh <documentId>` 查阅完整文档，排查是否存在**前置豁免条件、白名单例外、特定版本说明或后续章节的补充说明**。
+  * **⚠️ 发现疑似代码冲突时必须查验全文**：当切片内容与本地代码实现不一致时，**切勿轻易下达“代码存在 Bug”或“未遵循规范”的武断结论**！必须调用 `get_document.js <documentId>` 查阅完整文档，排查是否存在**前置豁免条件、白名单例外、特定版本说明或后续章节的补充说明**。
 - **调用文档全文脚本**：
   ```bash
-  bash "<SKILL_DIR>/scripts/get_document.sh" <documentId> [最大字符数，默认30000，传0不截断]
+  node "<SKILL_DIR>/scripts/get_document.js" <documentId> [最大字符数，默认30000，传0不截断]
   ```
   核对正文 Markdown，并特别记录文档的 `status`、`version` 与 `updateTime`。
 
 ### 5. 执行本地代码检索与调用链追踪
 
 - 优先使用 Agent 原生搜索与文件阅读工具（精确查找定义与引用）；
-- 或调用 [search_code.sh](./scripts/search_code.sh)：
+- 或调用 [search_code.js](./scripts/search_code.js)：
   ```bash
-  bash "<SKILL_DIR>/scripts/search_code.sh" '<关键词>' '[扩展名，如 java 或 java|xml|sql]'
+  node "<SKILL_DIR>/scripts/search_code.js" '<关键词>' '[扩展名，如 java 或 java|xml|sql]'
   ```
 - **代码研读要点**：
   * 务必阅读完整的代码方法实现、条件分支（`if/switch`）、注解属性（如 `@PreAuthorize`、`@Validated`）与异常抛出逻辑；

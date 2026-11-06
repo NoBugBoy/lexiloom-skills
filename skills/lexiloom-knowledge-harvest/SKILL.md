@@ -12,7 +12,7 @@ description: >-
 
 > **核心原则（禁止无脑透传）**：Agent **绝对不能**将未经审查和处理的原始文件或零散碎语直接发送给后端！必须认真研判数据是否具备提取知识的价值；必须完成结构化提炼重塑（纯文本碎片建议提炼为规范的 `.md` 文档；**若采集内容涉及系统截图、架构图、流程图等图片，强烈推荐使用 `.pdf` 或 Word（`.docx`）格式**，以完整内嵌图文信息；**合并生成的最终文件名最好采用清晰易懂的中文语义命名**）；只有在通过价值审查与安全门禁后，才调用后端接口 `POST /api/v1/openapi/documents/import` 完成最终导入。
 
-> **脚本路径约定**：下文中 `<SKILL_DIR>` 指代当前 `SKILL.md` 所在的目录路径。执行命令时，工作目录（`PWD`）应为**目标代码仓库或项目根目录**，命令使用 `<SKILL_DIR>/scripts/...` 完整路径，以便自动定位 `.lexiloom/config.json` 与 `.lexiloom.env`。严禁在终端或日志中回显明文 API Key。
+> **脚本路径约定**：下文中 `<SKILL_DIR>` 指代当前 `SKILL.md` 所在的目录路径。执行命令时，工作目录（`PWD`）应为**目标代码仓库或项目根目录**，命令使用 `node "<SKILL_DIR>/scripts/..."` 形式，零外部依赖，以便自动定位 `.lexiloom/config.json` 与 `.lexiloom.env`（同时保留有同名 `.sh` 薄脚本向后兼容）。严禁在终端或日志中回显明文 API Key。
 
 ---
 
@@ -126,7 +126,7 @@ flowchart TD
 - **配置完全复用**：本技能与 `lexiloom-hybrid-search` 检索技能使用完全相同的配置标准。
 - 若目标工程尚未绑定，引导执行：
   ```bash
-  bash "<SKILL_DIR>/scripts/setup.sh"
+  node "<SKILL_DIR>/scripts/setup.js"
   ```
 - 凭证由 `LEXILOOM_API_KEY` 环境变量或 `.lexiloom.env`（权限 `600`）提供。
 
@@ -146,11 +146,11 @@ flowchart TD
 ### 步骤 4：执行后端导入
 - 调用封装脚本向后端 `POST /api/v1/openapi/documents/import` 发送请求（使用中文文件名及精准中文标题）：
   ```bash
-  bash "<SKILL_DIR>/scripts/import_document.sh" "docs/kb_imported/客户支付超时排查指南与解决方案.md" \
+  node "<SKILL_DIR>/scripts/import_document.js" "docs/kb_imported/客户支付超时排查指南与解决方案.md" \
     --title "客户支付超时排查指南与解决方案" \
     --category-name "<分类名，如：产品需求 / 技术方案 / 测试用例 / 客服支持>"
   ```
-- 脚本通过标准输入向 `curl` 传递凭证，确保系统进程列表（`ps aux`）绝不泄露 API Key。
+- 脚本通过标准输入向服务端传递凭证，确保系统进程列表（`ps aux`）绝不泄露 API Key。
 
 ### 步骤 5：验证导入结果与向用户汇报
 - 读取脚本输出的导入状态、生成的 `documentId` 及切片数量；
