@@ -204,7 +204,7 @@ async function main() {
 
   if (results.length === 0) {
     console.log('未检索到相关切片。建议：');
-    console.log('  1. 提炼核心业务关键词/领域实体术语（避免直接输入整句口语提问）；');
+    console.log('  1. 保持完整自然语言句子做轻度同义改写（严禁拆解为空格分隔的关键词，切勿删减地名/机构名等专有名词）；');
     console.log('  2. 适当增大 topK（如 10）；');
     console.log('  3. 确认相关文档已入库并完成 AI 索引。');
     return;
