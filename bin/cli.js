@@ -390,8 +390,10 @@ function uninstallFrom(target) {
 
 async function main() {
   const rawArgv = process.argv.slice(2);
-  if (rawArgv[0] === 'mcp') {
-    const mcpOpts = parseMcpArgs(rawArgv.slice(1));
+  const invokedBin = path.basename(process.argv[1] || '').replace(/\.(js|cmd|ps1)$/i, '');
+  if (rawArgv[0] === 'mcp' || invokedBin === 'lexiloom-mcp') {
+    const mcpArgs = rawArgv[0] === 'mcp' ? rawArgv.slice(1) : rawArgv;
+    const mcpOpts = parseMcpArgs(mcpArgs);
     if (mcpOpts.help) return usage();
     const { startMcpServer } = require('../lib/mcp-server.js');
     startMcpServer(mcpOpts);

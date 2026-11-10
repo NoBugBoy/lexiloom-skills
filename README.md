@@ -161,7 +161,27 @@ MCP Server 在本地进程内完成 OpenAPI 鉴权（自动携带 `Authorization
 
 ### 3. 客户端 MCP 配置示例
 
-**方式 A：在已初始化绑定的代码仓库中使用（零明文密钥配置）**
+> **注意**：若尚未将包发布至公共 npm 仓库（`npmjs.com`），请使用 `github:NoBugBoy/lexiloom-skills` 源，或在本地仓库执行一次 `npm link` 后直接调用。
+
+**方式 A：通过 GitHub 源直接启动（推荐，未发布 npm 时开箱即用）**
+
+```json
+{
+  "mcpServers": {
+    "lexiloom": {
+      "command": "npx",
+      "args": ["-y", "github:NoBugBoy/lexiloom-skills", "mcp"],
+      "env": {
+        "LEXILOOM_URL": "http://localhost:8080",
+        "LEXILOOM_API_KEY": "lx_live_your_api_key_here",
+        "LEXILOOM_WORKSPACE_ID": "1"
+      }
+    }
+  }
+}
+```
+
+**方式 B：本地 `npm link` 或发布 npm 后启动（在已绑定 `.lexiloom.env` 的工程内可免配 `env`）**
 
 ```json
 {
@@ -169,24 +189,6 @@ MCP Server 在本地进程内完成 OpenAPI 鉴权（自动携带 `Authorization
     "lexiloom": {
       "command": "npx",
       "args": ["-y", "lexiloom-skills", "mcp"]
-    }
-  }
-}
-```
-
-**方式 B：在 Claude Desktop / 全局客户端中通过 `env` 显式注入凭证**
-
-```json
-{
-  "mcpServers": {
-    "lexiloom": {
-      "command": "npx",
-      "args": ["-y", "lexiloom-skills", "mcp"],
-      "env": {
-        "LEXILOOM_URL": "http://localhost:8080",
-        "LEXILOOM_API_KEY": "lx_live_your_api_key_here",
-        "LEXILOOM_WORKSPACE_ID": "1"
-      }
     }
   }
 }

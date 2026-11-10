@@ -7,7 +7,7 @@
   "bin": {
     "lexiloom-hybrid-search": "bin/cli.js",
     "lexiloom-skills": "bin/cli.js",
-    "lexiloom-mcp": "bin/mcp.js"
+    "lexiloom-mcp": "bin/cli.js"
   },
   "scripts": {
     "sync": "node lib/sync-skills.js",
