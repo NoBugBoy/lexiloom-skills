@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * LexiLoom Skills 共享通用工具库 (Node.js 原生零依赖版 - 安全加固型)
+ * LexiLoom Skills & MCP 共享通用工具库 (Node.js 原生零依赖版 - 安全加固型)
  * 依赖 Node.js >= 18 (内置 fetch, FormData, Blob, fs, path, os)
  */
 
@@ -18,7 +18,7 @@ const os = require('node:os');
  * 4. 回退到当前工作目录 process.cwd()
  */
 function findProjectRoot(startDir) {
-  let current = path.resolve(startDir || process.cwd());
+  let current = path.resolve(startDir || process.env.LEXILOOM_PROJECT_ROOT || process.cwd());
 
   // Pass 1: .lexiloom 目录或配置
   let p = current;
@@ -93,50 +93,78 @@ function sanitizeServerUrl(rawUrl) {
 }
 
 /**
- * 读取并校验 .lexiloom/config.json
+ * 读取并校验配置。
+ * 支持三级回退优先级：
+ * 1. 环境变量 (LEXILOOM_URL / LEXILOOM_SERVER_URL + LEXILOOM_WORKSPACE_ID)
+ * 2. 项目级配置文件 (<projectRoot>/.lexiloom/config.json)
+ * 3. 用户全局配置文件 (~/.lexiloom/config.json)
  */
-function loadConfig(projectRoot) {
-  const configFile = path.join(projectRoot, '.lexiloom', 'config.json');
-  if (!fs.existsSync(configFile)) {
-    const err = new Error('缺少 .lexiloom/config.json。请先在目标仓库运行 scripts/setup.js。');
+function loadConfig(projectRoot, overrides = {}) {
+  const root = projectRoot || findProjectRoot();
+  const projectConfigFile = path.join(root, '.lexiloom', 'config.json');
+  const globalConfigFile = path.join(os.homedir(), '.lexiloom', 'config.json');
+
+  let configFile = null;
+  if (fs.existsSync(projectConfigFile)) {
+    configFile = projectConfigFile;
+  } else if (fs.existsSync(globalConfigFile)) {
+    configFile = globalConfigFile;
+  }
+
+  let data = {};
+  if (configFile) {
+    try {
+      const raw = fs.readFileSync(configFile, 'utf8');
+      data = JSON.parse(raw);
+    } catch (e) {
+      throw new Error(`配置文件格式错误 (非有效 JSON): ${configFile} (${e.message})`);
+    }
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      throw new Error(`配置错误: ${configFile} 必须包含顶级 JSON 对象`);
+    }
+  }
+
+  const rawUrl =
+    overrides.serverUrl ||
+    process.env.LEXILOOM_URL ||
+    process.env.LEXILOOM_SERVER_URL ||
+    data.serverUrl ||
+    '';
+
+  const ws = data.workspace || {};
+  const rawWsId =
+    overrides.workspaceId !== undefined && overrides.workspaceId !== null && overrides.workspaceId !== ''
+      ? overrides.workspaceId
+      : process.env.LEXILOOM_WORKSPACE_ID !== undefined && process.env.LEXILOOM_WORKSPACE_ID !== ''
+        ? process.env.LEXILOOM_WORKSPACE_ID
+        : ws.id;
+
+  if (!configFile && !rawUrl && rawWsId === undefined) {
+    const err = new Error('缺少 .lexiloom/config.json 且未配置环境变量。请先在目标仓库运行 scripts/setup.js 或配置 MCP env。');
     err.code = 'CONFIG_NOT_FOUND';
     throw err;
   }
 
-  let data;
-  try {
-    const raw = fs.readFileSync(configFile, 'utf8');
-    data = JSON.parse(raw);
-  } catch (e) {
-    throw new Error(`配置文件格式错误 (非有效 JSON): ${configFile} (${e.message})`);
-  }
-
-  if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    throw new Error(`配置错误: ${configFile} 必须包含顶级 JSON 对象`);
-  }
-
-  const serverUrl = sanitizeServerUrl(data.serverUrl || '');
-
-  const ws = data.workspace || {};
-  const workspaceId = ws.id;
+  const serverUrl = sanitizeServerUrl(rawUrl || 'http://localhost:8080');
   const workspaceName = (ws.name || '').trim();
 
   if (
-    workspaceId === undefined ||
-    workspaceId === null ||
-    typeof workspaceId === 'boolean' ||
-    !Number.isInteger(Number(workspaceId)) ||
-    Number(workspaceId) <= 0
+    rawWsId === undefined ||
+    rawWsId === null ||
+    typeof rawWsId === 'boolean' ||
+    !Number.isInteger(Number(rawWsId)) ||
+    Number(rawWsId) <= 0
   ) {
-    throw new Error('配置错误: workspace.id 必须是正整数');
+    throw new Error('配置错误: workspace.id (或 LEXILOOM_WORKSPACE_ID) 必须是正整数');
   }
 
   return {
     serverUrl,
-    workspaceId: Number(workspaceId),
+    workspaceId: Number(rawWsId),
     workspaceName,
     search: data.search || {},
     raw: data,
+    configFile,
   };
 }
 
@@ -185,7 +213,38 @@ function saveConfig(projectRoot, configData) {
 }
 
 /**
- * 加载 API Key (优先级: 参数 > LEXILOOM_API_KEY 环境变量 > .lexiloom.env)
+ * 从指定的 env 文件解析 LEXILOOM_API_KEY
+ */
+function readKeyFromEnvFile(envFile) {
+  if (!envFile || !fs.existsSync(envFile)) return '';
+  try {
+    const lines = fs.readFileSync(envFile, 'utf8').split(/\r?\n/);
+    for (let line of lines) {
+      line = line.trim();
+      if (!line || line.startsWith('#')) continue;
+      if (line.startsWith('export ')) line = line.slice(7).trim();
+      if (line.startsWith('LEXILOOM_API_KEY=')) {
+        let val = line.slice('LEXILOOM_API_KEY='.length).trim();
+        const m = val.match(/^"([^"]*)"(?:\s+#.*)?$/) || val.match(/^'([^']*)'(?:\s+#.*)?$/);
+        if (m) {
+          val = m[1];
+        } else {
+          val = val.replace(/\s+#.*$/, '').trim();
+        }
+        if (val) return val;
+      }
+    }
+  } catch {}
+  return '';
+}
+
+/**
+ * 加载 API Key
+ * 优先级:
+ * 1. 显式参数 explicitKey
+ * 2. LEXILOOM_API_KEY 环境变量 (MCP Server env 或 Shell export)
+ * 3. 项目根目录 <projectRoot>/.lexiloom.env
+ * 4. 用户全局 ~/.lexiloom/.lexiloom.env 或 ~/.lexiloom.env
  */
 function loadApiKey(projectRoot, explicitKey) {
   if (explicitKey && explicitKey.trim()) {
@@ -197,26 +256,16 @@ function loadApiKey(projectRoot, explicitKey) {
     return envKey;
   }
 
-  const envFile = path.join(projectRoot, '.lexiloom.env');
-  if (fs.existsSync(envFile)) {
-    try {
-      const lines = fs.readFileSync(envFile, 'utf8').split(/\r?\n/);
-      for (let line of lines) {
-        line = line.trim();
-        if (!line || line.startsWith('#')) continue;
-        if (line.startsWith('export ')) line = line.slice(7).trim();
-        if (line.startsWith('LEXILOOM_API_KEY=')) {
-          let val = line.slice('LEXILOOM_API_KEY='.length).trim();
-          const m = val.match(/^"([^"]*)"(?:\s+#.*)?$/) || val.match(/^'([^']*)'(?:\s+#.*)?$/);
-          if (m) {
-            val = m[1];
-          } else {
-            val = val.replace(/\s+#.*$/, '').trim();
-          }
-          if (val) return val;
-        }
-      }
-    } catch {}
+  const root = projectRoot || findProjectRoot();
+  const candidates = [
+    path.join(root, '.lexiloom.env'),
+    path.join(os.homedir(), '.lexiloom', '.lexiloom.env'),
+    path.join(os.homedir(), '.lexiloom.env'),
+  ];
+
+  for (const envFile of candidates) {
+    const key = readKeyFromEnvFile(envFile);
+    if (key) return key;
   }
 
   return '';

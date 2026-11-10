@@ -135,11 +135,15 @@ function discoverSkills() {
 
 function usage() {
   const agentKeys = Object.keys(AGENTS).join(', ');
-  console.log(`LexiLoom Agent Skills Installer
+  console.log(`LexiLoom Agent Skills Installer & MCP Server
 
 Usage:
-  npx lexiloom-hybrid-search [options]
   npx lexiloom-skills [options]
+  npx lexiloom-skills mcp [mcp-options]
+  npx lexiloom-hybrid-search [options]
+
+Subcommands:
+  mcp                      Start LexiLoom MCP Server over stdio (JSON-RPC 2.0)
 
 Options:
   -g, --global             Install globally for all supported agents
@@ -154,14 +158,45 @@ Options:
   -y, --yes                Skip confirmation prompts (requires --scope and --agent, or -g)
   -h, --help               Show this help
 
+MCP Options (with 'mcp' subcommand):
+  --project-root <dir>     Explicit target repository root
+  --url <serverUrl>        Override LexiLoom server URL (or env LEXILOOM_URL)
+  --workspace-id <id>      Override default workspace ID (or env LEXILOOM_WORKSPACE_ID)
+
 Examples:
-  npx lexiloom-hybrid-search
-  npx lexiloom-hybrid-search --list
-  npx lexiloom-hybrid-search -g --only-install
-  npx lexiloom-hybrid-search --scope project --agent codex,claude,cursor
-  npx lexiloom-hybrid-search --scope global --agent all --only-install --yes
-  npx lexiloom-hybrid-search --only-setup
-  npx lexiloom-hybrid-search --scope project --agent codex --uninstall --yes`);
+  npx lexiloom-skills
+  npx lexiloom-skills mcp
+  npx lexiloom-skills --list
+  npx lexiloom-skills -g --only-install
+  npx lexiloom-skills --scope project --agent codex,claude,cursor
+  npx lexiloom-skills --scope global --agent all --only-install --yes
+  npx lexiloom-skills --only-setup
+  npx lexiloom-skills --scope project --agent codex --uninstall --yes`);
+}
+
+function parseMcpArgs(argv) {
+  const opts = {
+    projectRoot: '',
+    url: '',
+    workspaceId: undefined,
+    help: false,
+  };
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '--project-root') {
+      opts.projectRoot = argv[++i] || '';
+    } else if (arg === '--url') {
+      opts.url = argv[++i] || '';
+    } else if (arg === '--workspace-id') {
+      const val = argv[++i];
+      opts.workspaceId = val !== undefined && /^\d+$/.test(val) ? Number(val) : val;
+    } else if (arg === '-h' || arg === '--help') {
+      opts.help = true;
+    } else {
+      throw new Error(`未知 MCP 参数：${arg}`);
+    }
+  }
+  return opts;
 }
 
 function parseArgs(argv) {
@@ -324,10 +359,17 @@ function installSkillTo(sourceDir, target) {
 
   const scriptsDir = path.join(target, 'scripts');
   if (fs.existsSync(scriptsDir) && fs.statSync(scriptsDir).isDirectory()) {
+    // 始终用包级共享 lib/common.js 覆盖安装目录中的 _common.js，确保单源一致且自包含
+    const sharedCommon = path.join(PACKAGE_ROOT, 'lib', 'common.js');
+    const targetCommon = path.join(scriptsDir, '_common.js');
+    if (fs.existsSync(sharedCommon)) {
+      fs.copyFileSync(sharedCommon, targetCommon);
+    }
+
     for (const entry of fs.readdirSync(scriptsDir)) {
-      if (entry.endsWith('.sh')) {
+      if (entry.endsWith('.sh') || entry.endsWith('.js')) {
         const scriptPath = path.join(scriptsDir, entry);
-        if (fs.statSync(scriptPath).isFile()) {
+        if (fs.statSync(scriptPath).isFile() && entry !== '_common.js') {
           fs.chmodSync(scriptPath, 0o755);
         }
       }
@@ -347,7 +389,16 @@ function uninstallFrom(target) {
 }
 
 async function main() {
-  const opts = parseArgs(process.argv.slice(2));
+  const rawArgv = process.argv.slice(2);
+  if (rawArgv[0] === 'mcp') {
+    const mcpOpts = parseMcpArgs(rawArgv.slice(1));
+    if (mcpOpts.help) return usage();
+    const { startMcpServer } = require('../lib/mcp-server.js');
+    startMcpServer(mcpOpts);
+    return;
+  }
+
+  const opts = parseArgs(rawArgv);
   if (opts.help) return usage();
 
   const availableSkills = discoverSkills();

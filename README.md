@@ -120,13 +120,76 @@ node .agents/skills/lexiloom-hybrid-search/scripts/setup.js \
 
 ```bash
 # 1. 查询当前凭证可见的所有工作空间
-python3 skills/lexiloom-workspace-manager/scripts/manage_workspace.py list-workspaces
+node skills/lexiloom-workspace-manager/scripts/manage_workspace.js list-workspaces
 
 # 2. 切换至指定的工作空间（立刻在当前会话生效）
-python3 skills/lexiloom-workspace-manager/scripts/manage_workspace.py set-workspace --workspace-id 2
+node skills/lexiloom-workspace-manager/scripts/manage_workspace.js set-workspace --workspace-id 2
 
 # 3. 切换 AccessKey（自动探测验证，并立刻强制返回该 Key 可见工作空间供选择）
-python3 skills/lexiloom-workspace-manager/scripts/manage_workspace.py set-api-key --api-key <新Key>
+node skills/lexiloom-workspace-manager/scripts/manage_workspace.js set-api-key --api-key <新Key>
+```
+
+---
+
+## 🔌 作为 MCP Server 运行 (Model Context Protocol)
+
+本包内置了**零第三方依赖**的原生 Stdio MCP Server（`npx lexiloom-skills mcp` 或 `npx lexiloom-mcp`），支持同时挂载给 Claude Desktop、Cursor、Windsurf、Cline、Claude Code、Antigravity 等支持 MCP 协议的客户端，与 Agent Skills 协同工作（**Skills 负责分析工作流与对齐规范，MCP 负责结构化工具调用与凭证隔离**）。
+
+### 1. 暴露的 MCP 工具清单
+
+| 工具名称 | 功能说明 | 对应 OpenAPI 权限 |
+|---|---|---|
+| `search_knowledge` | 知识库多路混合检索与 Cross-Encoder 精排（支持传入 `query`, `topK`, `workspaceId`） | `kb:search` |
+| `get_document` | 提取单篇文档完整元数据与 Markdown 正文（支持 `documentId`, `maxChars`） | `doc:read` |
+| `import_document` | 将本地提炼好的文档（支持 14 种格式）安全导入指定工作空间 | `doc:write` |
+| `list_workspaces` | 查询当前 API Key 可见的所有工作空间列表及当前绑定状态 | `kb:read` |
+| `switch_workspace` | 切换并持久化绑定当前工程的默认工作空间（无需重启 MCP 即刻生效） | `kb:read` |
+
+### 2. MCP 鉴权与三级配置解析机制
+
+MCP Server 在本地进程内完成 OpenAPI 鉴权（自动携带 `Authorization: Bearer <Key>` 与 `X-API-Key: <Key>` 请求头，**大模型上下文完全接触不到明文密钥**），按以下三级优先级动态解析凭证与空间配置：
+
+1. **环境变量注入（最高优先级，适合 Claude Desktop 等全局客户端）**：
+   - `LEXILOOM_API_KEY`：访问密钥（如 `lx_live_xxx`）
+   - `LEXILOOM_URL`（或 `LEXILOOM_SERVER_URL`）：服务端地址（默认 `http://localhost:8080`）
+   - `LEXILOOM_WORKSPACE_ID`（可选）：默认工作空间 ID
+2. **项目级零配置复用（推荐，与 Skills 完全共享）**：
+   - 自动向上查找当前工程根目录下的 `.lexiloom.env` 与 `.lexiloom/config.json`。
+   - 若项目已执行过 `npx lexiloom-skills` 初始化绑定，挂载 MCP 时**无需重复配置任何环境变量**；且调用 `switch_workspace` 切换空间后立即生效。
+3. **用户全局兜底（`~/.lexiloom/`）**：
+   - 当在非代码仓库目录启动且未传环境变量时，自动回退读取 `~/.lexiloom/.lexiloom.env`（或 `~/.lexiloom.env`）与 `~/.lexiloom/config.json`。
+
+### 3. 客户端 MCP 配置示例
+
+**方式 A：在已初始化绑定的代码仓库中使用（零明文密钥配置）**
+
+```json
+{
+  "mcpServers": {
+    "lexiloom": {
+      "command": "npx",
+      "args": ["-y", "lexiloom-skills", "mcp"]
+    }
+  }
+}
+```
+
+**方式 B：在 Claude Desktop / 全局客户端中通过 `env` 显式注入凭证**
+
+```json
+{
+  "mcpServers": {
+    "lexiloom": {
+      "command": "npx",
+      "args": ["-y", "lexiloom-skills", "mcp"],
+      "env": {
+        "LEXILOOM_URL": "http://localhost:8080",
+        "LEXILOOM_API_KEY": "lx_live_your_api_key_here",
+        "LEXILOOM_WORKSPACE_ID": "1"
+      }
+    }
+  }
+}
 ```
 
 ## 运行要求

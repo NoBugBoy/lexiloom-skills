@@ -12,7 +12,7 @@ description: >-
 1. **指令一：切换空间（Switch Workspace）**：查询当前 AccessKey 在服务端所能查看到的全部工作空间列表，结构化呈现给用户进行选择，并在用户确认后安全更新本地配置，即刻在当前 Agent 对话及检索/入库中生效。
 2. **指令二：切换 AccessKey（Switch AccessKey）**：更换本项目的 API Key，并在更换完成后**立刻且固定触发选择工作空间流程**，确保新凭证与目标工作空间保持对齐。
 
-> **脚本路径约定**：下文中 `<SKILL_DIR>` 指代当前 `SKILL.md` 所在的目录路径。执行脚本时，工作目录应位于**目标代码仓库或项目根目录**。请优先直接调用 `node "<SKILL_DIR>/scripts/manage_workspace.js"`（零三方依赖，完全兼容 Node.js 18+ 原生环境；亦兼容 `python3` 调用）。
+> **调用方式约定（MCP 工具优先，脚本平滑回退）**：查询或切换工作空间时，若当前环境已挂载 `lexiloom` MCP Server，可优先直接调用 `list_workspaces` 与 `switch_workspace` 工具；涉及更新 API Key 或未挂载 MCP 时，下文中 `<SKILL_DIR>` 指代当前 `SKILL.md` 所在的目录路径。执行脚本时，工作目录应位于**目标代码仓库或项目根目录**。请优先直接调用 `node "<SKILL_DIR>/scripts/manage_workspace.js"`（零三方依赖，完全兼容 Node.js 18+ 原生环境；亦兼容 `python3` 调用）。
 > **安全准则**：脚本会自动处理 `.lexiloom.env`（权限 600 并加入 `.gitignore`），严禁在对话或终端输出中打印明文 AccessKey，仅展示脱敏后的 Key（如 `sk-***1234`）。
 
 ---
